@@ -57,10 +57,6 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .stage{position:relative;padding:18px 20px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
 .view{position:relative;flex:1;min-height:300px;border-radius:22px;overflow:hidden;background:radial-gradient(120% 90% at 50% 20%,#f7f3ec 0%,#f1eae0 70%,#ece4d8 100%);border:1px solid #e9e2d7}
 .view canvas{display:block;width:100%;height:100%;touch-action:none}
-.card{position:absolute;top:22px;left:22px;background:rgba(255,255,255,.93);padding:13px 20px 12px;border-left:4px solid var(--accent);box-shadow:0 2px 14px rgba(40,30,10,.06);pointer-events:none}
-.card.r{left:auto;right:22px;border-left:0;border-right:4px solid var(--accent);text-align:right}
-.card b{font-size:22px;font-weight:700;letter-spacing:-.01em;display:block}
-.card small{display:block;letter-spacing:.07em;color:var(--sub);font-weight:700;font-size:11.5px;margin-top:4px}
 .hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(55,55,55,.82);color:#fff;padding:9px 18px;border-radius:99px;font-weight:700;font-size:13px;transition:opacity .6s;pointer-events:none;white-space:nowrap}
 .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .views{display:flex;gap:5px;flex-wrap:wrap}
@@ -152,10 +148,6 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
   .app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:100vh;height:100dvh}
   .stage{order:-1;padding:8px 8px 6px;gap:6px;background:var(--bg);border-bottom:1px solid var(--line);box-shadow:0 4px 12px rgba(0,0,0,.04);z-index:2}
   .view{height:42vh;height:42dvh;min-height:210px;flex:none;border-radius:16px}
-  .card{top:10px;left:10px;padding:7px 11px 6px;border-left-width:3px}
-  .card.r{right:10px;border-right-width:3px}
-  .card b{font-size:14px}
-  .card small{font-size:9.5px;margin-top:2px}
   .hint{font-size:11px;bottom:10px;padding:7px 13px}
   .bar{flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
   .bar::-webkit-scrollbar,.checks::-webkit-scrollbar{display:none}
@@ -209,9 +201,7 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 
   <main class="stage">
     <div class="view" id="view">
-      <div class="card l"><b id="cDesk">–</b><small id="cDeskS">DESK</small></div>
-      <div class="card r"><b id="cMon">–</b><small id="cMonS">MONITOR</small></div>
-      <div class="hint" id="hint">드래그하여 회전 · 스크롤하여 확대</div>
+      <div class="hint" id="hint">물건을 끌어 옮기기 · 빈 곳을 끌어 회전 · 스크롤하여 확대</div>
     </div>
     <div class="bar">
       <div class="views" id="views">
@@ -856,6 +846,90 @@ const fill=new THREE.DirectionalLight(0xfff3e4,.18);fill.position.set(2200,1400,
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(40000,40000),new THREE.ShadowMaterial({opacity:.16}));
 floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
 
+
+/* ---------- 마우스로 물건 끌어 옮기기 ----------
+   물건 위에서 누르면 그 물건을 바닥과 평행한 면에서 옮기고, 빈 곳에서 누르면 지금처럼 화면을 돌린다.
+   옮기면 패널의 좌우·앞뒤 값(monX·monBack, x·back, x·z, gap·shift)이 바뀌므로 승인 카드·점검·채팅이 같은 값을 본다.
+   책상 1(기준점)과 자동으로 놓이는 물건(키보드·마우스·노트북·스피커·PC 본체·의자)은 옮기지 않는다. */
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+const clampF=(f,v)=>Math.min(f.max,Math.max(f.min,Math.round(v/(f.step||10))*(f.step||10)));
+const fieldOf=(list,k)=>list.find(f=>f.k===k);
+const UIF=k=>{for(const sec of UI)for(const it of sec.items)if(it.k===k)return it};
+function pickItem(ev){
+  if(!info.pick)return null;
+  const r=renderer.domElement.getBoundingClientRect();
+  ndc.set((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ndc,camera);
+  const hit=ray.intersectObjects(info.pick,true)[0];
+  if(!hit)return null;
+  for(let o=hit.object;o;o=o.parent)if(o.userData.drag)return {id:o.userData.drag,point:hit.point};
+  return null; // 맨 앞에 맞은 것이 책상 1처럼 옮길 수 없는 물건
+}
+function planePoint(ev,y){
+  const r=renderer.domElement.getBoundingClientRect();
+  ndc.set((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ndc,camera);
+  return ray.ray.intersectPlane(new THREE.Plane(V(0,1,0),-y),V(0,0,0));
+}
+// 월드 좌표의 이동(dx,dz)을 책상(회전 r) 기준 좌우·앞뒤로 바꾼다
+function toDesk(dx,dz,r){const c=Math.cos(r),s=Math.sin(r);return{lx:dx*c-dz*s,lz:dx*s+dz*c}}
+// 옮기는 동안 상세 설정의 숫자·슬라이더도 따라가게 한다(블록을 다시 그리지 않고 값만 바꾼다)
+function syncInputs(box,i,keys){
+  const b=document.getElementById(box);if(!b)return;
+  const e=S[ARR.find(a=>a.box===box).key][i];
+  for(const k of keys)b.querySelectorAll(`[data-i="${i}"][data-f="${k}"]`).forEach(inp=>{inp.value=e[k]});
+}
+function moveItem(d,dx,dz){
+  const [type,idx]=d.id.split(':'),i=Number(idx);
+  if(type==='mon'){set('monX',clampF(UIF('monX'),d.base.monX+dx));set('monBack',clampF(UIF('monBack'),d.base.monBack+dz));return}
+  const e=S[type][i];if(!e)return;
+  if(type==='monitors'||type==='sets'){
+    const F=type==='sets'?SF:MF,{lx,lz}=toDesk(dx,dz,deskCtx(e.desk).r);
+    e.x=clampF(fieldOf(F,'x'),d.base.x+lx);e.back=clampF(fieldOf(F,'back'),d.base.back+lz);
+    syncInputs(type,i,['x','back']);
+  }else if(type==='pegs'){
+    e.x=clampF(fieldOf(PF,'x'),d.base.x+toDesk(dx,dz,deskCtx(e.desk).r).lx);syncInputs('pegs',i,['x']);
+  }else if(type==='drawers'){
+    e.x=clampF(fieldOf(DF,'x'),d.base.x+dx);e.z=clampF(fieldOf(DF,'z'),d.base.z+dz);syncInputs('drawers',i,['x','z']);
+  }else if(type==='extraDesks'){
+    // 놓인 자리마다 '간격(gap)'과 '이동(shift)'이 가리키는 방향이 다르다(placeExtra와 같은 규칙)
+    const m={right:['gap',1,'shift',1],left:['gap',-1,'shift',1],rightL:['gap',1,'shift',1],leftL:['gap',-1,'shift',1],
+             back:['shift',1,'gap',-1],frontR:['shift',1,'gap',1],frontL:['shift',1,'gap',1]}[e.place]||['gap',1,'shift',1];
+    const set2=(k,v)=>{e[k]=clampF(fieldOf(XF,k),d.base[k]+v)};
+    set2(m[0],m[1]*dx);set2(m[2],m[3]*dz);syncInputs('extra',i,['gap','shift']);
+  }
+  schedule();
+}
+let drag=null;
+view.addEventListener('pointerdown',ev=>{
+  if(ev.button!==0||ev.target!==renderer.domElement)return;
+  const p=pickItem(ev);if(!p)return; // 빈 곳: 화면 돌리기(OrbitControls)
+  const [type,idx]=p.id.split(':');
+  const base=type==='mon'?{monX:S.monX,monBack:S.monBack}:{...S[type][Number(idx)]};
+  drag={id:p.id,base,y:p.point.y,start:p.point.clone(),pid:ev.pointerId,moved:false};
+  controls.enabled=false;$('#hint').style.opacity=0;
+  renderer.domElement.setPointerCapture(ev.pointerId);renderer.domElement.style.cursor='grabbing';
+  if(sel!==p.id){sel=p.id;renderItems()}
+},true); // 캡처 단계: OrbitControls보다 먼저 받아서, 물건을 누른 경우 화면이 돌지 않게 한다
+let hoverQueued=false;
+renderer.domElement.addEventListener('pointermove',ev=>{
+  if(drag&&ev.pointerId===drag.pid){
+    const q=planePoint(ev,drag.y);if(!q)return;
+    const dx=q.x-drag.start.x,dz=q.z-drag.start.z;
+    if(!drag.moved&&Math.hypot(dx,dz)<8)return; // 살짝 누르기만 하면 선택만 한다
+    drag.moved=true;moveItem(drag,dx,dz);return;
+  }
+  if(ev.pointerType!=='mouse'||ev.buttons||hoverQueued)return;
+  hoverQueued=true;requestAnimationFrame(()=>{hoverQueued=false;renderer.domElement.style.cursor=pickItem(ev)?'grab':''});
+});
+function endDrag(ev){
+  if(!drag||ev.pointerId!==drag.pid)return;
+  renderer.domElement.releasePointerCapture?.(ev.pointerId);
+  drag=null;controls.enabled=true;renderer.domElement.style.cursor='';
+}
+renderer.domElement.addEventListener('pointerup',endDrag);
+renderer.domElement.addEventListener('pointercancel',endDrag);
+
 /* ---------- helpers ---------- */
 const MC={};
 function M(color,o={}){const k=color+JSON.stringify(o);return MC[k]||(MC[k]=new THREE.MeshStandardMaterial(Object.assign({color,roughness:o.r??.6,metalness:o.m??0},o.x||{})))}
@@ -1034,7 +1108,7 @@ function build(){
   const roomG=new THREE.Group();root.add(roomG);roomWalls=[];let room=null;
   if(S.room)room=buildRoom(roomG);floor.visible=!S.room;
   buildDesk(deskG,W,D,H);
-  const xGroups=S.extraDesks.map(e=>{const xg=new THREE.Group();buildDesk(xg,e.w,e.d,e.h);const p=placeExtra(e);xg.position.set(p.x,0,p.z);xg.rotation.y=p.r;deskG.add(xg);return {xg,e}});
+  const xGroups=S.extraDesks.map((e,i)=>{const xg=new THREE.Group();buildDesk(xg,e.w,e.d,e.h);const p=placeExtra(e);xg.position.set(p.x,0,p.z);xg.rotation.y=p.r;xg.userData.drag='extraDesks:'+i;deskG.add(xg);return {xg,e}});
 
   /* monitors */
   const spec=MONITORS[S.mon],curved=S.curved&&!!spec.R;
@@ -1042,7 +1116,7 @@ function build(){
   const mainZ=-D/2+S.monBack,mainCY=H+S.monLift+main.chin+main.h/2;
   main.g.position.set(S.monX,mainCY,mainZ);
   if(S.mount==='stand')addStand(main,-(S.monLift+main.chin+main.h/2));
-  items.add(main.g);
+  main.g.userData.drag='mon';items.add(main.g);
   const mons=[main];
   items.updateMatrixWorld(true);
   let tray=null;
@@ -1076,7 +1150,7 @@ function build(){
     }
   }
   // 추가 모니터: 각자 모델·거치·책상·위치·높이·각도를 따로 가진다. 책상 1 위의 것만 좌우 여유·시야각 점검에 들어간다
-  const monItems=S.monitors.map(e=>{const it=buildMonitorItem(e,deskCtx(e.desk));(e.desk?extra:items).add(it.g);return {it,e}});
+  const monItems=S.monitors.map((e,i)=>{const it=buildMonitorItem(e,deskCtx(e.desk));it.g.userData.drag='monitors:'+i;(e.desk?extra:items).add(it.g);return {it,e}});
   items.updateMatrixWorld(true);
   monItems.forEach(({it,e})=>{if(!e.desk)mons.push(it.m)});
   const monBox=new THREE.Box3();mons.forEach(m=>monBox.expandByObject(m.body));
@@ -1106,9 +1180,9 @@ function build(){
   if(S.tower==='floor'){const t=buildTower(-1);t.position.set(W/2-260,0,0);extra.add(t)}
   if(S.chair){const ch=buildChair(Math.round(.255*S.userH*10));ch.position.set(0,0,D/2+290);extra.add(ch)}
 
-  S.sets.forEach(e=>extra.add(buildSet(e,deskCtx(e.desk))));
-  S.pegs.forEach(e=>extra.add(buildPeg(e,deskCtx(e.desk))));
-  const dGroups=S.drawers.map(e=>{const dg=buildDrawer(e);const p=placeDrawer(e);dg.position.set(p.x,0,p.z);dg.rotation.y=p.r;extra.add(dg);return {dg,e}});
+  S.sets.forEach((e,i)=>{const g=buildSet(e,deskCtx(e.desk));g.userData.drag='sets:'+i;extra.add(g)});
+  S.pegs.forEach((e,i)=>{const g=buildPeg(e,deskCtx(e.desk));g.userData.drag='pegs:'+i;extra.add(g)});
+  const dGroups=S.drawers.map((e,i)=>{const dg=buildDrawer(e);const p=placeDrawer(e);dg.position.set(p.x,0,p.z);dg.rotation.y=p.r;dg.userData.drag='drawers:'+i;extra.add(dg);return {dg,e}});
   root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
   roomG.traverse(o=>{if(o.isMesh)o.castShadow=false});
   {const sz=room?Math.max(4200,Math.max(S.roomW,S.roomD)*.75+Math.abs(S.roomX)):4200;Object.assign(sun.shadow.camera,{left:-sz,right:sz,top:sz,bottom:-sz,far:12000});sun.shadow.camera.updateProjectionMatrix()}
@@ -1132,20 +1206,13 @@ function build(){
   const itemBox=new THREE.Box3().setFromObject(items);
   deskG.updateMatrixWorld(true);const deskBox=room?new THREE.Box3(V(room.xl,0,room.zb),V(room.xr,S.deskH,room.zf)):new THREE.Box3().setFromObject(deskG);
   root.updateMatrixWorld(true);const allBox=new THREE.Box3();[deskG,items,extra].forEach(o=>allBox.expandByObject(o));
-  info={room,allBox,deskBox,main,mainZ,mainCY,monBox,itemBox,kb,kbZ,mons,curved};
-  updateCards();renderChecks();renderItems(); // 어떤 설정이 바뀌어도(배열 아이템 편집 포함) 목록 요약이 따라가게
+  info={room,allBox,deskBox,main,mainZ,mainCY,monBox,itemBox,kb,kbZ,mons,curved,pick:[deskG,items,extra]};
+  renderChecks();renderItems(); // 어떤 설정이 바뀌어도(배열 아이템 편집 포함) 목록 요약이 따라가게
 }
 let pending=0;function schedule(){if(pending)return;pending=requestAnimationFrame(()=>{pending=0;build()})}
 function flush(){if(pending){cancelAnimationFrame(pending);pending=0;build()}} // 예약된 다시 그리기를 지금 끝낸다(적용 직후 점검 결과를 읽을 때)
 
 /* ---------- cards & checks ---------- */
-function updateCards(){
-  const m=info.main,spec=MONITORS[S.mon];
-  $('#cDesk').textContent=`${S.deskW} × ${S.deskD}`;
-  $('#cDeskS').textContent=`DESK / H ${S.deskH} mm${S.extraDesks.length?` · +${S.extraDesks.length} DESK`:''}${S.drawers.length?` · ${S.drawers.length} DRAWER`:''}`;
-  $('#cMon').textContent=`${Math.round(m.w)} × ${Math.round(m.h)}`;
-  $('#cMonS').textContent=`${spec.short}${info.curved?' CURVED':''}${S.mount==='armLap'?` + LAPTOP ${S.lapSize}"`:''}${S.monitors.length?` + 모니터 ${S.monitors.length}대`:''} / mm`;
-}
 function eyeY(){const H=S.userH*10;return S.deskH>=900?.936*H:S.deskH+.295*H}
 let lastChecks=[];
 function renderChecks(){

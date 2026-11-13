@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "desk-simulator",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "src.web.app:app", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

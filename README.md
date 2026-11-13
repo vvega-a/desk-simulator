@@ -57,7 +57,7 @@ flowchart LR
 
 - **서버·화면**: FastAPI 서버(`src/web/app.py`)와 HTML 한 장(`src/web/static/index.html`, Three.js). 서버는 **상태를 보관하지 않는다**. 질문마다 브라우저가 현재 상태·점검 결과·설정 스키마·저장 슬롯 요약을 같이 보낸다.
 - **에이전트가 쓰는 유일한 통로 `window.deskSim`**: 시뮬레이터 안쪽 구현(IIFE)을 직접 건드리지 않고 이 API로만 읽고 바꾼다. 값은 화면 패널과 같은 정의(범위·선택지)로 검증하고, 추가·삭제는 패널의 버튼·핸들러를 그대로 재사용해서 채팅으로 만든 물건과 손으로 만든 물건의 기본값이 같다.
-- **화면 구성**: 왼쪽 위 **아이템 목록**(현재 씬의 물건 + 추가/삭제), 3D 아래 **선택한 아이템의 상세 설정**, 오른쪽 **채팅 패널**. 모든 물건에는 화면·승인 카드·에이전트가 같은 `이름 번호`(책상 1, 모니터 2, 서랍장 1 …)가 붙고, 지우면 뒤 번호가 당겨진다.
+- **화면 구성**: 왼쪽 위 **아이템 목록**(현재 씬의 물건 + 추가/삭제), 3D 아래 **선택한 아이템의 상세 설정**, 오른쪽 **채팅 패널**. 모든 물건에는 화면·승인 카드·에이전트가 같은 `이름 번호`(책상 1, 모니터 2, 서랍장 1 …)가 붙고, 지우면 뒤 번호가 당겨진다. 3D 화면에서 물건을 **마우스로 끌어 옮길 수 있다**(모니터 1·추가 모니터·추가 책상·서랍장·모니터+노트북 세트·타공판. 누른 물건이 선택되고, 옮긴 값은 상세 설정의 좌우·앞뒤 값에 그대로 들어간다). 빈 곳을 끌면 화면이 돈다. 책상 1(기준점)과 자동으로 놓이는 키보드·마우스·노트북·스피커·PC 본체·의자는 옮기지 않는다.
 - **독립 모니터**: 모니터 1과 같은 설정(모델·커브드·거치·책상·위치·높이·각도·세로 피벗)을 모니터마다 따로 가진다. 모니터 1 포함 최대 4대.
 - **LLM**: AWS Bedrock(Claude Haiku 4.5). **임베딩**: Bedrock Titan Text Embeddings V2(`BEDROCK_EMBED_MODEL_ID`, 선택). 조각이 26개뿐이라 별도 벡터 DB 없이 서버 시작 때 한 번 임베딩해 메모리에 둔다(약 5초, 백그라운드).
 - **관측**: LangSmith(`LANGSMITH_TRACING=true`와 키를 `.env`에 넣으면 자동으로 trace가 쌓인다). 노드별 걸린 시간과 LLM 호출의 토큰·비용을 볼 수 있다. 스크린샷의 프로젝트 이름이 `mini-pjt`인 것은 실행한 `.env`의 `LANGSMITH_PROJECT`가 그 값이었기 때문이고, `.env.sample`의 기본 이름은 `desk-simulator`다.
@@ -237,9 +237,10 @@ python -m src.evaluation.rag_eval          # 검색 평가: 질의 20개, 구성
 - `src/agent/settings.py:67` — 도메인 검증(도구의 `tools.py` 격): `validate_patch`, 물건 추가·수정·삭제 `validate_ops:143`, 장면 동작 `validate_scene_action:203`, 변경 전후 비교 `diff_items:125`, 도구 응답 글 `format_settings:30`
 - `src/agent/context.py:29` — 상태·점검 결과를 LLM이 읽을 글로 바꾸는 `describe`, 물건 번호·개수 한도 목록 `describe_collections:64`
 - `src/web/app.py:113` — 채팅 스트림 `chat_stream`, 승인 `chat_approve:123`, 요청 모델 `ChatRequest:44`·`ApproveRequest:54`
-- `src/web/static/index.html:1390` — 에이전트용 API `window.deskSim`. 값 검증 `checkValue:1267`, 단일 설정 `applyPatch:1277`, 물건 정의 `COLS:1294`·`collections:1311`, 물건 편집 `setFields:1333`·`runOp:1348`, 장면 동작 `runAction:1369`, 묶음 적용 `applyChanges:1381`, 예전 슬롯 변환 `migrate:1243`
-- `src/web/static/index.html:1028` — 3D 장면 `build`, 독립 모니터 `buildMonitorItem:765`·`newMonitor:755`·`renderMonitors:788`, 인체공학 점검 `renderChecks:1151`
-- `src/web/static/index.html:346` — 아이템 목록·상세 설정: `ARR:346`, `ITEM_DEFS:354`, `renderItems:451`
-- `src/web/static/index.html:1405` — 채팅 패널(스트림 읽기, 승인 카드, 되돌리기)
+- `src/web/static/index.html:1457` — 에이전트용 API `window.deskSim`. 값 검증 `checkValue:1334`, 단일 설정 `applyPatch:1344`, 물건 정의 `COLS:1361`·`collections:1378`, 물건 편집 `setFields:1400`·`runOp:1415`, 장면 동작 `runAction:1436`, 묶음 적용 `applyChanges:1448`, 예전 슬롯 변환 `migrate:1310`
+- `src/web/static/index.html:1102` — 3D 장면 `build`, 독립 모니터 `buildMonitorItem:755`·`newMonitor:745`·`renderMonitors:778`, 인체공학 점검 `renderChecks:1218`
+- `src/web/static/index.html:336` — 아이템 목록·상세 설정: `ARR:336`, `ITEM_DEFS:344`, `renderItems:441`
+- `src/web/static/index.html:858` — 마우스로 끌어 옮기기: 물건 고르기 `pickItem`, 이동 → 설정 값 변환 `moveItem:882`
+- `src/web/static/index.html:1477` — 채팅 패널(스트림 읽기, 승인 카드, 되돌리기)
 - `src/evaluation/evaluate.py:113` — 평가 러너: 한 실행 채점 `check_run`, 승인 카드 patch 비교 `check_patch:63`, 승인·취소 뒤 `check_after_resume:159`, 범위 밖 판정 LCEL 체인 `judge_chain:202`·`judge_out_of_scope:211`(`JUDGE_PROMPT:190`), 인프라 오류 재시도·분리 `run_case:237`·`is_infra_error:232`, 집계 `summarize_runs:276`, 보고서 `render_report:308`, 진입점 `main:337`
 - `src/evaluation/rag_eval.py` — 검색 평가: 구성 `CONFIGS`, 채점 `score_queries`(hit@1·hit@k·MRR)
