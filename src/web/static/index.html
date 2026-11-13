@@ -111,6 +111,20 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .msgs{flex:1;min-height:0;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:10px}
 .msg{max-width:90%;padding:9px 13px;border-radius:14px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
 .msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.prods{align-self:stretch;border:1px solid var(--line);border-radius:14px;background:#fcfcfa;padding:10px 12px;font-size:12.5px}
+.prods h4{margin:0 0 6px;font-size:12.5px;font-weight:700}
+.prods h4 small{font-weight:500;color:var(--sub)}
+.prods ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.prods li{border-top:1px solid var(--line);padding-top:6px}
+.prods li:first-child{border-top:0;padding-top:0}
+.prods a{color:var(--ink);font-weight:600;text-decoration:none;display:block;line-height:1.4}
+.prods a:hover,.prods a:focus-visible{color:var(--accent);text-decoration:underline}
+.prods .meta{color:var(--sub);margin-top:2px}
+.prods .tag{display:inline-block;border-radius:6px;padding:0 6px;margin-right:4px;font-weight:700;font-size:11px;background:#eef0f3;color:var(--sub)}
+.prods .tag.ok{background:#e6f6ec;color:var(--ok)}
+.prods .tag.near{background:#fdf2e2;color:var(--warn)}
+.prods .more{display:inline-block;margin-top:8px;color:var(--accent);font-weight:700}
+.prods .note{margin-top:6px}
 .msg.ai{align-self:flex-start;background:#f2f2ef;border-bottom-left-radius:4px}
 .msg.err{align-self:flex-start;background:#fdecec;color:#991b1b}
 .msg-step{align-self:flex-start;font-size:12px;color:var(--sub);padding:0 4px}
@@ -1525,6 +1539,34 @@ function showApproval(ev){
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* 스트림 한 번을 읽어 화면에 그린다. 승인 대기 이벤트가 오면 그것을 돌려주고, 아니면 null */
+// 상품 검색 결과 카드. 글은 모두 textContent로 넣고, 링크는 https만 연다(서버가 준 글을 HTML로 해석하지 않는다)
+function showProducts(ev){
+  const box=document.createElement('div');box.className='prods';
+  const h=document.createElement('h4');h.textContent=`네이버 쇼핑 · ${ev.label||''} `;
+  const q=document.createElement('small');q.textContent=`"${ev.query||''}"`;h.appendChild(q);box.appendChild(h);
+  const safe=u=>typeof u==='string'&&u.startsWith('https://');
+  const link=(href,text,cls)=>{const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=text;if(cls)a.className=cls;return a};
+  const items=(ev.items||[]).filter(it=>safe(it.link));
+  if(items.length){
+    const ol=document.createElement('ol');
+    for(const it of items){
+      const li=document.createElement('li');li.appendChild(link(it.link,it.title));
+      const m=document.createElement('div');m.className='meta';
+      const tag=document.createElement('span');tag.className='tag'+(it.match==='일치'?' ok':it.match==='근접'?' near':'');
+      tag.textContent=it.match+(it.size?` ${it.size}`:'');m.appendChild(tag);
+      m.appendChild(document.createTextNode(`${it.price?it.price.toLocaleString('ko-KR')+'원':'가격 정보 없음'}${it.mall?' · '+it.mall:''}`));
+      li.appendChild(m);ol.appendChild(li);
+    }
+    box.appendChild(ol);
+    const n=document.createElement('p');n.className='note';n.textContent='치수 표시는 상품명 기준이에요. 판매 페이지에서 실제 치수를 확인해 주세요.';box.appendChild(n);
+  }else{
+    const n=document.createElement('p');n.className='note';
+    n.textContent=ev.error?'상품 목록을 가져오지 못했어요. 아래 링크에서 같은 검색어로 찾아보세요.':ev.mode==='link'?'쇼핑 API 키가 없어 목록 대신 검색 링크를 드려요(.env의 NAVER_CLIENT_ID·SECRET).':'맞는 상품을 찾지 못했어요.';
+    box.appendChild(n);
+  }
+  if(safe(ev.url))box.appendChild(link(ev.url,'네이버 쇼핑에서 더 보기 →','more'));
+  msgs.appendChild(box);msgs.scrollTop=msgs.scrollHeight;
+}
 async function run(url,body){
   const status=add('msg-step','…');let bubble=null,approval=null,gap=false;
   try{
@@ -1546,6 +1588,7 @@ async function run(url,body){
           else if(gap&&!/\s$/.test(bubble.textContent))t='\n'+t; // 도구를 거치며 끊긴 앞뒤 문장이 붙지 않게
           gap=false;turn.text+=t;bubble.textContent+=t;msgs.scrollTop=msgs.scrollHeight}
         else if(ev.type==='approval'){approval=ev}
+        else if(ev.type==='products'){showProducts(ev);gap=true}
         else if(ev.type==='client_action'){ // 승인이 필요 없는 화면 보기 변경
           if(ev.action==='set_view'){if(ev.view)deskSim.view(ev.view);if(typeof ev.auto_rotate==='boolean')deskSim.autoRotate(ev.auto_rotate)}}
         else if(ev.type==='done'){turn.tools=ev.tools||[];if(!bubble&&ev.message){add('msg ai',ev.message);turn.text+=(turn.text?'\n':'')+ev.message}}

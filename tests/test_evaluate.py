@@ -144,9 +144,10 @@ def test_summarize_runs_aggregates_by_case_and_category():
 
 def test_query_set_has_the_planned_shape():
     ids = [c["id"] for c in CASES]
-    assert len(CASES) == 33 and len(set(ids)) == 33
+    assert len(CASES) == 35 and len(set(ids)) == 35
     counts = {k: sum(c["category"] == k for c in CASES) for k in ("in", "out", "guardrail")}
-    assert counts == {"in": 23, "out": 5, "guardrail": 5}
+    assert counts == {"in": 25, "out": 5, "guardrail": 5}
+    assert sum(c["id"].startswith("shop_") for c in CASES) == 2  # 상품 검색 케이스
     assert sum(c["id"].startswith("rag_") for c in CASES) == 3  # 가이드 문서 검색(RAG) 케이스
     assert all(c["question"].strip() and "expect" in c for c in CASES)
     assert all(c.get("resume") in (None, "approve", "reject") for c in CASES)

@@ -13,6 +13,8 @@
   act    : 도구를 실행한다.
            list_settings   바로 실행(읽기)
            search_guides   가이드 문서 하이브리드 검색(RAG, 읽기) — src/rag/retriever.py
+           search_products 지금 물건과 치수가 맞는 상품을 네이버 쇼핑에서 검색(외부 API, 읽기) — src/shop/search.py
+                           결과는 화면에 상품 카드로 보낸다(products 이벤트)
            set_view        화면 보기 변경은 되돌리기 쉬워 승인 없이 브라우저에 알린다(client_action 이벤트)
            propose_changes 단일 설정 변경 + 아이템 추가·수정·삭제 → interrupt()로 멈춰 사용자 승인
            scene_action    초기화·슬롯 저장/불러오기 → interrupt()로 멈춰 사용자 승인
@@ -22,6 +24,7 @@
   {"type": "step", "phase": "start" | "done", "node": 노드, "label": 이름, "detail"?: 설명}
   {"type": "token", "text": 답변 조각}   (개인정보는 내보내기 전에 한 번 더 가린다)
   {"type": "client_action", "action": "set_view", "view"?, "auto_rotate"?}   (브라우저가 바로 실행)
+  {"type": "products", "label", "query", "url", "items": [{title, link, price, mall, match, size}], "mode", "error"}   (상품 카드)
   {"type": "approval", "thread_id", "reason", "changes", "patch", "rejected", "notes"}   (승인 대기, 호출이 여기서 끝남)
 """
 import re
@@ -46,6 +49,7 @@ from src.agent.settings import (
 )
 from src.core import guard
 from src.rag.retriever import format_hits
+from src.shop import search as shop
 
 MAX_LOOPS = 6  # agent가 도구를 부르며 돌 수 있는 최대 횟수
 SEARCH_K = 3  # search_guides가 돌려주는 문서 조각 수
@@ -58,6 +62,7 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 - 노트북·PC 본체·스피커·의자·방·데스크매트·키보드/마우스 추가·삭제: changes에서 해당 설정 켜기/끄기(list_settings로 키 확인). 켜고 끄는 키: 방=room, 스피커=speakers, 의자=chair, 치수선=dims. '방을 보이게 해줘'는 시점 변경이 아니라 room 설정을 켜는 요청이야
 - 초기화, 저장 슬롯(A·B·C) 저장·불러오기: scene_action
 - 화면 시점(사선·정면·위에서·옆·앉은 시점)과 자동 회전: set_view
+- 지금 셋업의 물건과 치수가 맞는 실제 상품 찾기(예: 지금 책상에 맞는 모델 찾아줘, 이 모니터 어디서 사?): search_products
 - 권장 기준·이유·고르는 요령 같은 일반 지식(예: 모니터 높이는 어느 정도가 좋아? 목이 아파, 울트라와이드랑 듀얼 중 뭐가 나아?): search_guides
 
 규칙:
@@ -77,6 +82,8 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 - 사용자가 허용 범위를 벗어난 값(예: 책상 가로 5000)을 말해도 되묻지 말고 말한 값 그대로 제안해. 범위 안으로 맞추는 건 네가 계산하지 않아도 코드가 하고, 어떻게 맞췄는지 승인 카드에 보여 줘.
 - 개수 한도에 이미 도달한 물건(현재 셋업에 '더 추가할 수 없음'이라고 적힌 것)은 추가를 제안하지 말고 한도를 알려 줘.
 - 사용자가 말하는 스피커·노트북·의자·서랍장 같은 물건은 모두 시뮬레이터 화면 속 가상의 물건이야. "켜줘/놔줘/추가해줘"는 추가, "꺼줘/빼줘/치워줘"는 삭제 요청으로 봐.
+- 상품을 찾을 때는 search_products의 target에 화면 이름(책상 1, 모니터 2, 서랍장 1, 의자 …)을 넣어. 치수·규격은 코드가 현재 셋업에서 읽으니 네가 숫자를 넣지 마. 사용자가 말한 색·브랜드·가격대만 keywords에 넣어.
+- 상품 이름·가격·링크는 화면에 카드로 나와. 답에서는 치수가 맞는 것 한두 개만 짧게 짚고, 검색 결과에 없는 상품·가격은 절대 지어내지 마. 치수는 상품명 기준이라 판매 페이지에서 확인하라고 한 번 말해. 상품을 사거나 주문하는 일은 하지 않아.
 - 기능과 관계없는 요청은 정중히 사양하고 셋업 얘기로 돌아와.
 - 답은 5문장 이내의 평범한 글로 써. 화면이 마크다운을 그리지 못하니 **굵게**, # 제목, 표, 목록 기호를 쓰지 마.
 
@@ -99,6 +106,13 @@ class SearchGuides(BaseModel):
     """인체공학·배치 가이드 문서를 검색한다(읽기, 승인 불필요). 권장 기준, 그 이유, 고르는 요령을 근거와 함께 답할 때 쓴다."""
 
     query: str = Field(description="찾을 내용을 짧은 한국어 문장으로(예: '모니터 높이와 눈높이', '스탠딩 데스크 높이')")
+
+
+class SearchProducts(BaseModel):
+    """지금 셋업의 물건과 치수·규격이 맞는 상품을 네이버 쇼핑에서 찾는다(읽기, 승인 불필요). 결과는 화면에 상품 카드로 뜬다."""
+
+    target: str = Field(description="찾을 물건의 화면 이름: 책상 1, 책상 2, 모니터 1, 모니터 2, 서랍장 1, 타공판 1, 데스크매트, 키보드, 의자, 모니터암")
+    keywords: str | None = Field(default=None, description="사용자가 말한 색·브랜드·가격대 같은 추가 검색어(예: '화이트', '모션데스크'). 치수는 넣지 않는다")
 
 
 class ArrayOp(BaseModel):
@@ -357,11 +371,23 @@ def _summarize(summarizer, older: list[dict]) -> str:
     return summary
 
 
-def build_graph(llm, checkpointer=None, retriever=None, summarizer="default"):
+def _search_products(state: AgentState, args: dict, shop_keys: tuple[str, str]) -> str:
+    target = shop.target_from_state(str(args.get("target") or ""), state.get("desk_state") or {})
+    if isinstance(target, str):
+        _step_done("act", "찾을 물건을 알아보지 못했어요")
+        return target
+    r = shop.search(target, str(args.get("keywords") or ""), *shop_keys)
+    _emit({"type": "products", **{k: r[k] for k in ("label", "query", "url", "items", "mode", "error")}})
+    _step_done("act", f"{target.label}에 맞는 상품을 찾았어요({len(r['items'])}개)" if r["items"] else "네이버 쇼핑 검색 링크를 만들었어요")
+    return shop.format_result(r)
+
+
+def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", shop_keys=("", "")):
     """llm: ChatBedrockConverse 호환(bind_tools와 stream을 가진 객체). checkpointer는 interrupt에 필요해서 기본으로 메모리를 쓴다.
     retriever: 가이드 문서 검색기(src.rag.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다.
-    summarizer: 오래된 대화 요약 Runnable({conversation} → 글). 기본은 llm으로 만든 LCEL 체인, None이면 요약하지 않는다."""
-    tool_llm = llm.bind_tools([ListSettings, SearchGuides, ProposeChanges, SceneAction, SetView])
+    summarizer: 오래된 대화 요약 Runnable({conversation} → 글). 기본은 llm으로 만든 LCEL 체인, None이면 요약하지 않는다.
+    shop_keys: 네이버 검색 API (Client ID, Client Secret). 비어 있으면 상품 검색은 검색 링크만 돌려준다."""
+    tool_llm = llm.bind_tools([ListSettings, SearchGuides, SearchProducts, ProposeChanges, SceneAction, SetView])
     if summarizer == "default":
         summarizer = default_summarizer(llm)
 
@@ -420,6 +446,8 @@ def build_graph(llm, checkpointer=None, retriever=None, summarizer="default"):
                 _step_done("act", f"설정 목록을 조회했어요({args.get('section') or '전체'})")
             elif name == "SearchGuides":
                 content = _search_guides(retriever, args)
+            elif name == "SearchProducts":
+                content = _search_products(state, args, shop_keys)
             elif name == "SetView":
                 content = _set_view(args)
             elif name in ("ProposeChanges", "SceneAction") and declined:
@@ -480,7 +508,7 @@ def build_default_graph():
     retriever = build_retriever(s["embed_model_id"], s["region"], retry)
     # 문서 조각 임베딩(약 5초)을 미리 해 둬 첫 검색이 느리지 않게 한다. 실패하면 키워드 검색만으로 계속한다
     threading.Thread(target=retriever.warm_up, daemon=True).start()
-    return build_graph(llm, retriever=retriever)
+    return build_graph(llm, retriever=retriever, shop_keys=(s["naver_client_id"], s["naver_client_secret"]))
 
 
 def _run(graph, payload, thread_id: str):

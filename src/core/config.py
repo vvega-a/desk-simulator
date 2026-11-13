@@ -43,6 +43,9 @@ def load_settings() -> dict:
         raise ConfigError("BEDROCK_MAX_RETRIES는 0 이상의 정수여야 해요.") from None
     # 선택 값: 가이드 문서 검색(RAG)의 임베딩 모델. 비우면 벡터 검색 없이 키워드(BM25) 검색만 한다
     settings["embed_model_id"] = _env("BEDROCK_EMBED_MODEL_ID")
+    # 선택 값: 상품 검색(네이버 검색 API 쇼핑). 비우면 상품 목록 없이 네이버 쇼핑 검색 링크만 준다
+    settings["naver_client_id"] = _env("NAVER_CLIENT_ID")
+    settings["naver_client_secret"] = _env("NAVER_CLIENT_SECRET")
     return settings
 
 

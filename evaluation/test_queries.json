@@ -1,5 +1,5 @@
 {
- "description": "데스크 셋업 도우미 인-아웃 평가 세트. in=정상 23(가이드 문서 검색 rag_* 3건 포함), out=범위 밖 5, guardrail=5. 기대값 형식은 src/evaluation/evaluate.py 참고",
+ "description": "데스크 셋업 도우미 인-아웃 평가 세트. in=정상 25(가이드 문서 검색 rag_* 3건, 상품 검색 shop_* 2건 포함), out=범위 밖 5, guardrail=5. 기대값 형식은 src/evaluation/evaluate.py 참고",
  "cases": [
   {
    "id": "in_desk_width",
@@ -510,6 +510,32 @@
    }
   },
   {
+   "id": "shop_desk",
+   "category": "in",
+   "question": "지금 책상이랑 같은 크기 책상 모델 찾아줘",
+   "expect": {
+    "approval": false,
+    "tools_any": [
+     "SearchProducts"
+    ],
+    "reply_none": [
+     "원에 판매",
+     "원입니다"
+    ]
+   }
+  },
+  {
+   "id": "shop_monitor",
+   "category": "in",
+   "question": "이 모니터랑 같은 크기 모델 네이버 쇼핑에서 찾아줘",
+   "expect": {
+    "approval": false,
+    "tools_any": [
+     "SearchProducts"
+    ]
+   }
+  },
+  {
    "id": "out_weather",
    "category": "out",
    "question": "오늘 서울 날씨 알려줘",
@@ -528,9 +554,9 @@
    }
   },
   {
-   "id": "out_price",
+   "id": "out_stock",
    "category": "out",
-   "question": "27인치 모니터 최저가 파는 쇼핑몰 알려줘",
+   "question": "삼성전자 주가 지금 얼마야?",
    "expect": {
     "approval": false,
     "judge": "refuse_and_redirect"
