@@ -61,7 +61,7 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 - 단일 설정 바꾸기(책상·모니터·키보드·방 등): propose_changes의 changes
 - 물건 추가·수정·삭제(모니터 2 이상·추가 책상·서랍장·모니터+노트북 세트·타공판): propose_changes의 array_ops. 모니터 2부터는 각각 독립이라 모델·거치·책상·위치·높이·각도를 따로 정해
 - 노트북·PC 본체·스피커·의자·방·데스크매트·키보드/마우스 추가·삭제: changes에서 해당 설정 켜기/끄기(list_settings로 키 확인). 켜고 끄는 키: 방=room, 스피커=speakers, 의자=chair, 치수선=dims. '방을 보이게 해줘'는 시점 변경이 아니라 room 설정을 켜는 요청이야
-- 초기화, 저장 슬롯(A·B·C) 저장·불러오기: scene_action
+- 초기화, 저장 슬롯(A·B·C·D·E·F) 저장·불러오기: scene_action
 - 화면 시점(사선·정면·위에서·옆·앉은 시점)과 자동 회전: set_view
 - 지금 셋업의 물건과 치수가 맞는 실제 상품 찾기(예: 지금 책상에 맞는 모델 찾아줘, 이 모니터 어디서 사?): search_products
 - 권장 기준·이유·고르는 요령 같은 일반 지식(예: 모니터 높이는 어느 정도가 좋아? 목이 아파, 울트라와이드랑 듀얼 중 뭐가 나아?): search_guides
@@ -144,7 +144,7 @@ class SceneAction(BaseModel):
     """장면 전체에 대한 동작을 사용자에게 제안한다. 사용자가 승인해야 실행된다. reset=모든 설정 초기화, save_slot=현재 설정을 슬롯에 저장, load_slot=슬롯 내용으로 교체."""
 
     action: Literal["reset", "save_slot", "load_slot"]
-    slot: Literal["A", "B", "C"] | None = Field(default=None, description="save_slot·load_slot에서 슬롯 이름")
+    slot: Literal["A", "B", "C", "D", "E", "F"] | None = Field(default=None, description="save_slot·load_slot에서 슬롯 이름")
     reason: str = Field(description="왜 하는지 한 줄 설명(사용자에게 보인다)")
 
 

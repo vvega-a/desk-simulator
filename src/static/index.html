@@ -142,6 +142,13 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .approval .done{color:var(--sub);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .approval .undo{border:0;background:none;color:var(--accent);font-weight:700;font-size:12.5px;min-height:44px;padding:0 4px}
 .starters[hidden]{display:none}
+.dlg-back{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50}
+.dlg-back[hidden]{display:none}
+.dlg{background:#fff;border-radius:14px;padding:20px;width:min(340px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.dlg b{font-size:15px}.dlg p{margin:8px 0 16px;font-size:13px;color:var(--sub);line-height:1.5}
+.dlg .btns{display:flex;gap:8px;justify-content:flex-end}
+.dlg .btns button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:0 16px;min-height:40px;font-weight:700;font-size:13px}
+.dlg .btns .ok{background:var(--accent);border-color:var(--accent);color:#fff}
 .starters button{border:1px solid var(--line);background:#fafaf8;border-radius:99px;padding:8px 12px;font-size:12.5px;font-weight:500;min-height:36px}
 .chat-form{display:flex;gap:8px;align-items:flex-end;padding:10px 16px 16px;border-top:1px solid var(--line)}
 .chat-form textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:inherit;font-size:13.5px;line-height:1.4;max-height:120px;background:#fafaf8;min-height:44px}
@@ -240,6 +247,9 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
     </div>
     <div class="msgs" id="msgs" aria-live="polite"></div>
     <div class="starters" id="starters"></div>
+    <div class="dlg-back" id="resetDlg" hidden><div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="resetDlgT">
+      <b id="resetDlgT">채팅을 초기화할까요?</b><p>저장 슬롯의 설정을 불러왔어요. 지금까지의 대화 내용을 지우고 새로 시작할 수 있어요.</p>
+      <div class="btns"><button type="button" class="no">유지</button><button type="button" class="ok">초기화</button></div></div></div>
     <form class="chat-form" id="chatForm">
       <textarea id="chatInput" rows="1" maxlength="1000" placeholder="셋업에 대해 물어보세요" aria-label="질문 입력"></textarea>
       <button class="chat-send" id="chatSend" type="submit">보내기</button>
@@ -281,7 +291,7 @@ const DEFAULTS={deskW:1400,deskD:700,deskH:720,deskColor:'#f3f0ea',frameColor:'#
   room:false,roomW:3000,roomD:3300,roomH:2300,roomRot:0,roomX:0,roomGap:0,wallColor:'#f4f2ee',floorColor:'#d9b98f',win:true,winW:1500,winX:0,door:true,doorWall:'right',lapSide:'left',lapSize:'14',lapAngle:17,monX:0,armX:0,sets:[],pegs:[],monitors:[]};
 const CHAIR_COLORS=[{v:'#2c2d31',l:'블랙'},{v:'#8f9296',l:'그레이'},{v:'#f3f0ea',l:'화이트'},{v:'#2c3a5a',l:'네이비'},{v:'#9bb3a1',l:'세이지'},{v:'#8a5a3c',l:'브라운'}];
 const PEG_COLORS=[{v:'#f2f1ed',l:'화이트'},{v:'#26272a',l:'블랙'},{v:'#9ea2a6',l:'그레이'},{v:'#c9a57c',l:'우드'},{v:'#bcd6cc',l:'민트'}];
-const PF=[{k:'w',t:'가로',min:300,max:2400,step:10},{k:'h',t:'세로',min:200,max:1400,step:10},{k:'lift',t:'책상 위로 띄우기',min:0,max:900,step:10},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10}];
+const PF=[{k:'w',t:'가로',min:300,max:2400,step:10},{k:'h',t:'세로',min:200,max:1400,step:10},{k:'lift',t:'책상 위로 띄우기',min:0,max:900,step:10},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10},{k:'z',t:'앞뒤 위치 (+ 앞쪽·사용자 쪽)',min:-1000,max:1000,step:10}];
 const SF=[{k:'yaw',t:'모니터 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)',min:-60,max:60,step:1,unit:'°'},{k:'lapAng',t:'노트북 안쪽으로 꺾는 각도',min:0,max:70,step:1,unit:'°'},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10},{k:'lift',t:'모니터 하단 높이',min:0,max:450,step:5},{k:'back',t:'화면 위치 (책상 뒤 끝 → 화면)',min:60,max:500,step:10}];
 const WALL_COLORS=[{v:'#f4f2ee',l:'화이트'},{v:'#e6e0d8',l:'웜그레이'},{v:'#ece2d2',l:'베이지'},{v:'#d3dccf',l:'세이지'},{v:'#d5dbe3',l:'블루그레이'}];
 const FLOOR_COLORS=[{v:'#d9b98f',l:'밝은 원목'},{v:'#c39a6b',l:'내추럴 원목'},{v:'#6e4e37',l:'어두운 원목'},{v:'#bdb9b2',l:'그레이'},{v:'#ecebe7',l:'화이트 타일'}];
@@ -651,7 +661,7 @@ function renderSets(){
 }
 function renderPegs(){
   const box=$('#pegs'),L=S.pegs;
-  L.forEach(e=>{if(e.desk>S.extraDesks.length)e.desk=0});
+  L.forEach(e=>{if(e.desk>S.extraDesks.length)e.desk=0;if(e.z==null)e.z=0});
   const deskOpts=[{v:0,l:'책상 1'},...S.extraDesks.map((_,i)=>({v:i+1,l:`책상 ${i+2}`}))];
   box.innerHTML=L.map((e,i)=>`<div class="xd"><div class="xh"><b>타공판 ${i+1}</b><button class="del" data-i="${i}">삭제</button></div>
     <div class="lab"><span>놓을 책상 (뒤쪽 끝)</span></div><div class="seg" style="margin-bottom:12px">${deskOpts.map(o=>`<button data-i="${i}" data-desk="${o.v}" class="${e.desk===o.v?'on':''}">${o.l}</button>`).join('')}</div>
@@ -670,7 +680,7 @@ function renderPegs(){
   box.querySelectorAll('.del').forEach(b=>b.addEventListener('click',()=>{L.splice(Number(b.dataset.i),1);re()}));
   const add=$('#addPeg');if(add)add.addEventListener('click',()=>{
     const used=L.map(e=>e.desk);const desk=[0,...S.extraDesks.map((_,i)=>i+1)].find(d=>!used.includes(d))??0;
-    const c=deskCtx(desk);L.push({desk,color:'#f2f1ed',w:Math.min(1000,c.w-100),h:600,lift:0,x:0,mount:'clamp',acc:true});re();
+    const c=deskCtx(desk);L.push({desk,color:'#f2f1ed',w:Math.min(1000,c.w-100),h:600,lift:0,x:0,z:0,mount:'clamp',acc:true});re();
   });
 }
 function pegTex(hex){
@@ -703,15 +713,15 @@ function buildPeg(e,c){
     for(let i=0;i<3;i++){pg.add(at(box(8,8,50,am),(i-1)*70,-e.h*.3,fz+25));pg.add(at(box(14,110,14,M(['#e0533b','#1f5eff','#f2b632'][i],{r:.5})),(i-1)*70,-e.h*.3-58,fz+46))}
   }
   if(mode==='easel'){
-    const a=-.14,z0=-c.d/2+30+e.h*.26;
+    const a=-.14,ez=e.z||0,z0=-c.d/2+30+e.h*.26+ez;
     const pv=new THREE.Group();pv.position.set(e.x,c.h+8,z0);pv.rotation.x=a;pg.position.set(0,e.h/2,0);pv.add(pg);g.add(pv);
     const ly=e.h*.72,az=z0+ly*Math.sin(a)-T/2*Math.cos(a),ay=c.h+8+ly*Math.cos(a);
     for(const s of[-1,1]){const lx=e.x+s*(e.w/2-Math.min(70,e.w/6));
-      g.add(cylBetween(V(lx,ay,az),V(lx,c.h,-c.d/2+28),11,fm));
-      g.add(at(box(40,8,30,M('#1e1f22',{r:.8})),lx,c.h+4,-c.d/2+28));
+      g.add(cylBetween(V(lx,ay,az),V(lx,c.h,-c.d/2+28+ez),11,fm));
+      g.add(at(box(40,8,30,M('#1e1f22',{r:.8})),lx,c.h+4,-c.d/2+28+ez));
       g.add(at(box(Math.min(120,e.w/4),16,40,fm),lx,c.h+8,z0+6));}
   }else if(mode==='floor'){
-    const bz=-c.d/2-45,by=c.h+e.lift+e.h/2,top=c.h+e.lift+e.h;
+    const bz=-c.d/2-45+(e.z||0),by=c.h+e.lift+e.h/2,top=c.h+e.lift+e.h;
     pg.position.set(e.x,by,bz);g.add(pg);
     for(const s of[-1,1]){const px=e.x+s*(e.w/2+18);
       g.add(at(box(36,top+20,30,fm),px,(top+20)/2,bz));
@@ -719,11 +729,11 @@ function buildPeg(e,c){
       for(const fz of[bz-120,bz+280])g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(20,20,14,16),M('#1e1f22',{r:.8})),px,7,fz));}
     g.add(at(box(e.w+36,30,30,fm),e.x,Math.min(c.h-120,350),bz));
   }else{
-    const bz=-c.d/2+12,by=c.h+e.lift+e.h/2,top=c.h+e.lift+e.h;
+    const ez=e.z||0,bz=-c.d/2+12+ez,by=c.h+e.lift+e.h/2,top=c.h+e.lift+e.h;
     pg.position.set(e.x,by,bz);g.add(pg);
     if(mode==='clamp')for(const s of[-1,1]){const px=e.x+s*(e.w/2+15);
       g.add(at(box(30,top-c.h+20,26,fm),px,(top+c.h-20)/2,bz));
-      g.add(at(box(60,70,90,fm),px,c.h-20,-c.d/2+45));}
+      g.add(at(box(60,70,90,fm),px,c.h-20,-c.d/2+45+ez));}
   }
   g.position.set(c.x,0,c.z);g.rotation.y=c.r;
   return g;
@@ -1313,14 +1323,15 @@ $('#reset').addEventListener('click',()=>setView('iso'));
 $('#auto').addEventListener('change',e=>setAuto(e.target.checked));
 
 /* ---------- slots ---------- */
+const SLOT_KEYS=['A','B','C','D','E','F'];
 let memSlots={};
 function getSlots(){try{return JSON.parse(localStorage.getItem('desksim-slots')||'null')||memSlots}catch(e){return memSlots}}
 function putSlots(o){memSlots=o;try{localStorage.setItem('desksim-slots',JSON.stringify(o))}catch(e){}}
 function summary(c){return `${c.deskW}×${c.deskD} · ${MONITORS[c.mon]?.short||''}${(c.monitors?c.monitors.length:(c.subCount||0))?` + 모니터 ${c.monitors?c.monitors.length:c.subCount}대`:''} · ${KB_NAME[c.kb]}${c.extraDesks&&c.extraDesks.length?` · 책상 ${c.extraDesks.length+1}개`:''}${c.drawers&&c.drawers.length?` · 서랍 ${c.drawers.length}`:''}${c.room?` · 방 ${c.roomW}×${c.roomD}`:''}${c.sets&&c.sets.length?` · 세트 ${c.sets.length}`:''}${c.pegs&&c.pegs.length?` · 타공판 ${c.pegs.length}`:''}`}
 function renderSlots(){
   const sl=getSlots();
-  $('#slots').innerHTML=['A','B','C'].map(k=>`<div class="slot"><button class="load ${sl[k]?'':'empty'}" data-k="${k}"><b>${k}</b>${sl[k]?summary(sl[k]):'비어 있음'}</button><button class="save" data-k="${k}">저장</button></div>`).join('');
-  $('#slots').querySelectorAll('.load').forEach(b=>b.addEventListener('click',()=>{const c=getSlots()[b.dataset.k];if(!c)return;loadState(c)}));
+  $('#slots').innerHTML=SLOT_KEYS.map(k=>`<div class="slot"><button class="load ${sl[k]?'':'empty'}" data-k="${k}"><b>${k}</b>${sl[k]?summary(sl[k]):'비어 있음'}</button><button class="save" data-k="${k}">저장</button></div>`).join('');
+  $('#slots').querySelectorAll('.load').forEach(b=>b.addEventListener('click',()=>{const c=getSlots()[b.dataset.k];if(!c)return;loadState(c);if(window.deskChat)deskChat.askReset()}));
   $('#slots').querySelectorAll('.save').forEach(b=>b.addEventListener('click',()=>{const o={...getSlots()};o[b.dataset.k]=JSON.parse(JSON.stringify(S));putSlots(o);renderSlots()}));
 }
 
@@ -1425,7 +1436,7 @@ function afterSet(col,k,e){
     if(e.where.startsWith('FL')){e.h=Math.min(e.h,S.deskH);e.casters=false}
     if(e.where[0]==='L'&&e.w<S.deskD){e.w=Math.min(1200,S.deskD+200);e.h=Math.min(e.h,S.deskH);e.casters=false;e.tiers=Math.max(e.tiers,2)}}
   if(col==='sets'&&k==='desk')e.x=0;
-  if(col==='pegs'&&k==='desk'){e.x=0;e.w=Math.min(e.w,deskCtx(e.desk).w)}
+  if(col==='pegs'&&k==='desk'){e.x=0;e.z=0;e.w=Math.min(e.w,deskCtx(e.desk).w)}
   if(col==='pegs'&&k==='mount'&&e.mount==='floor'&&S.room&&e.desk===0&&S.roomGap<200){S.roomGap=200;refreshUI()}
 }
 /* 한 아이템의 값을 검증해 넣는다. 거절된 값은 사유 글로 돌려준다 */
@@ -1468,7 +1479,7 @@ function runOp(op){
 function runAction(a){
   const slots=getSlots();
   if(a.action==='reset'){loadState({});return okOp('모든 설정을 처음 상태로 되돌렸어요')}
-  if(!['A','B','C'].includes(a.slot))return failOp('슬롯은 A, B, C 중 하나예요');
+  if(!SLOT_KEYS.includes(a.slot))return failOp('슬롯은 '+SLOT_KEYS.join(', ')+' 중 하나예요');
   if(a.action==='load_slot'){
     if(!slots[a.slot])return failOp(`슬롯 ${a.slot}는 비어 있어요`);
     loadState(slots[a.slot]);return okOp(`슬롯 ${a.slot}를 불러왔어요`);
@@ -1485,7 +1496,7 @@ function applyChanges(spec){
   flush();
   return res;
 }
-function slotInfo(){const s=getSlots();return Object.fromEntries(['A','B','C'].map(k=>[k,s[k]?summary(s[k]):null]))}
+function slotInfo(){const s=getSlots();return Object.fromEntries(SLOT_KEYS.map(k=>[k,s[k]?summary(s[k]):null]))}
 window.deskSim={
   getState:()=>clone(S),
   getChecks:()=>clone(lastChecks),
@@ -1628,9 +1639,20 @@ async function run(url,body){
 $('#chatForm').addEventListener('submit',e=>{e.preventDefault();send(input.value)});
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send(input.value)}});
 input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(120,input.scrollHeight)+'px'});
+// 저장 슬롯을 불러온 뒤 화면 쪽에서 부른다: 대화가 있으면 초기화할지 묻는다
+window.deskChat={askReset(){
+  if(busy||msgs.children.length<=1)return; // 인사말만 있으면 지울 대화가 없다
+  const dlg=$('#resetDlg'),ok=dlg.querySelector('.ok'),no=dlg.querySelector('.no');
+  const close=()=>{dlg.hidden=true;ok.onclick=no.onclick=null;document.removeEventListener('keydown',esc2)};
+  const esc2=e=>{if(e.key==='Escape')close()};
+  ok.onclick=()=>{history.length=0;lastState=null;turn=null;msgs.innerHTML='';add('msg ai',GREETING);$('#starters').hidden=false;close()};
+  no.onclick=close;document.addEventListener('keydown',esc2);
+  dlg.hidden=false;no.focus();
+}};
 $('#starters').innerHTML=STARTERS.map(t=>`<button type="button">${t}</button>`).join('');
 $('#starters').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>send(b.textContent)));
-add('msg ai','안녕하세요! 지금 꾸며 둔 셋업을 보고 조언하고, 화면의 기능을 대신 써 드려요. 설정 바꾸기, 서랍장·타공판·모니터 추가, 슬롯 저장·불러오기, 시점 바꾸기까지 말로 시키세요. 바뀌는 내용은 먼저 보여 드리고, 승인하면 적용해요.');
+const GREETING='안녕하세요! 지금 꾸며 둔 셋업을 보고 조언하고, 화면의 기능을 대신 써 드려요. 설정 바꾸기, 서랍장·타공판·모니터 추가, 슬롯 저장·불러오기, 시점 바꾸기까지 말로 시키세요. 바뀌는 내용은 먼저 보여 드리고, 승인하면 적용해요.';
+add('msg ai',GREETING);
 setOpen(matchMedia('(min-width:1200px)').matches);
 })();
 </script>

@@ -137,7 +137,7 @@ def diff_items(clean: dict, current: dict, schema: list[dict]) -> tuple[list[dic
 
 BAD_VALUE_PREFIX = "이해하지 못한 값 — "  # 키·선택지를 못 알아들은 경우(모델의 추측)와 단순히 못 하는 경우(최대 개수 등)를 구분한다
 VIEW_NAMES = {"iso": "사선", "front": "정면", "top": "위에서", "side": "옆", "pov": "앉은 시점"}
-SLOTS = ("A", "B", "C")
+SLOTS = ("A", "B", "C", "D", "E", "F")
 
 
 def validate_ops(ops: list, collections: dict, state: dict) -> tuple[list[dict], list[dict], list[str], dict]:
@@ -207,7 +207,7 @@ def validate_scene_action(action: str | None, slot: str | None, slots: dict) -> 
     if action not in ("load_slot", "save_slot"):
         return None, None, "action은 reset, load_slot, save_slot 중 하나여야 해요"
     if slot not in SLOTS:
-        return None, None, "slot은 A, B, C 중 하나여야 해요"
+        return None, None, "slot은 A, B, C, D, E, F 중 하나여야 해요"
     filled = slots.get(slot)
     if action == "load_slot":
         if not filled:
