@@ -91,6 +91,18 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .msg.err{align-self:flex-start;background:#fdecec;color:#991b1b}
 .msg-step{align-self:flex-start;font-size:12px;color:var(--sub);padding:0 4px}
 .starters{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px}
+.approval{align-self:stretch;border:1px solid #b5c4f4;background:#f5f8ff;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5}
+.approval b{display:block;font-size:13.5px;margin-bottom:4px}
+.approval .why{color:var(--sub);margin:0 0 8px}
+.approval ul{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:4px}
+.approval li{display:flex;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:6px 9px}
+.approval li span:last-child{font-weight:700;text-align:right}
+.approval .warn{font-size:12px;color:var(--warn);margin:0 0 8px}
+.approval .btns{display:flex;gap:8px}
+.approval .btns button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px}
+.approval .btns .ok{background:var(--accent);border-color:var(--accent);color:#fff}
+.approval .done{color:var(--sub);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.approval .undo{border:0;background:none;color:var(--accent);font-weight:700;font-size:12.5px;min-height:44px;padding:0 4px}
 .starters[hidden]{display:none}
 .starters button{border:1px solid var(--line);background:#fafaf8;border-radius:99px;padding:8px 12px;font-size:12.5px;font-weight:500;min-height:36px}
 .chat-form{display:flex;gap:8px;align-items:flex-end;padding:10px 16px 16px;border-top:1px solid var(--line)}
@@ -98,9 +110,13 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .chat-form textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .chat-send{border:0;background:var(--accent);color:#fff;border-radius:12px;padding:0 16px;font-weight:700;min-height:44px}
 .chat-send:disabled{opacity:.5;cursor:default}
+@media (max-width:1199px){ /* 좁은 화면에서는 3D 영역을 줄이지 않고 채팅을 오른쪽 서랍으로 겹쳐 띄운다 */
+  .app.chat-open{grid-template-columns:350px 1fr}
+  .chat{position:fixed;top:0;right:0;bottom:0;width:380px;z-index:20;box-shadow:-8px 0 24px rgba(0,0,0,.14)}
+}
 @media (max-width:880px){
   .app.chat-open{grid-template-columns:1fr}
-  .chat{position:fixed;left:0;right:0;bottom:0;height:62vh;height:62dvh;z-index:20;border-left:0;border-radius:18px 18px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.14)}
+  .chat{left:0;right:0;top:auto;bottom:0;width:auto;height:62vh;height:62dvh;border-left:0;border-radius:18px 18px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.14)}
 }
 @media (max-width:880px){
   html,body{height:100%;overflow:hidden}
@@ -932,7 +948,8 @@ function build(){
   info={room,allBox,deskBox,main,mainZ,mainCY,monBox,itemBox,kb,kbZ,mons,curved};
   updateCards();renderChecks();
 }
-let pending=false;function schedule(){if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;build()})}
+let pending=0;function schedule(){if(pending)return;pending=requestAnimationFrame(()=>{pending=0;build()})}
+function flush(){if(pending){cancelAnimationFrame(pending);pending=0;build()}} // 예약된 다시 그리기를 지금 끝낸다(적용 직후 점검 결과를 읽을 때)
 
 /* ---------- cards & checks ---------- */
 function updateCards(){
@@ -1058,6 +1075,7 @@ function applyPatch(patch){
     }
     set(k,v);applied[k]=S[k];
   }
+  flush(); // 바로 getChecks()로 새 점검 결과를 읽을 수 있게
   return {applied,rejected};
 }
 window.deskSim={
@@ -1076,7 +1094,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>build());
 (function(){
 const $=s=>document.querySelector(s);
 const app=document.querySelector('.app'),msgs=$('#msgs'),input=$('#chatInput'),sendBtn=$('#chatSend'),toggle=$('#chatToggle');
-const STARTERS=['지금 내 셋업 괜찮아?','눈이랑 화면 거리는 적당해?','가장 먼저 고칠 게 뭐야?'];
+const STARTERS=['지금 내 셋업 괜찮아?','눈이랑 화면 거리는 적당해?','모니터를 32인치로 바꿔줘'];
 const history=[];let busy=false;
 
 function setOpen(open){app.classList.toggle('chat-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.textContent=open?'AI 채팅 닫기':'AI 채팅';
@@ -1087,15 +1105,48 @@ $('#chatClose').addEventListener('click',()=>setOpen(false));
 function add(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d}
 function setBusy(b){busy=b;sendBtn.disabled=b;input.disabled=b;if(!b)input.focus()}
 
+let turn=null; // 지금 진행 중인 한 번의 질문: {q, text, failed}. 승인을 기다리며 요청이 둘로 나뉘어도 한 턴으로 기록한다
+function finishTurn(){
+  if(turn&&!turn.failed&&turn.text)history.push({role:'user',content:turn.q},{role:'assistant',content:turn.text});
+  turn=null;setBusy(false);
+}
 async function send(question){
   question=question.trim();if(!question||busy)return;
   if(!window.deskSim){add('msg err','시뮬레이터가 아직 준비되지 않았어요.');return}
   $('#starters').hidden=true;
   add('msg user',question);input.value='';input.style.height='auto';setBusy(true);
-  const status=add('msg-step','…');let bubble=null,answer='',failed=false;
+  turn={q:question,text:'',failed:false};
+  const ap=await run('/api/chat/stream',{question,history:history.slice(-10),state:deskSim.getState(),checks:deskSim.getChecks(),settings_schema:deskSim.schema()});
+  ap?showApproval(ap):finishTurn();
+}
+function showApproval(ev){
+  const card=document.createElement('div');card.className='approval';card.setAttribute('role','group');card.setAttribute('aria-label','설정 변경 승인');
+  const li=ev.changes.map(c=>`<li><span>${esc(c.label)}</span><span>${esc(c.from)} → ${esc(c.to)}</span></li>`).join('');
+  const extra=[...Object.values(ev.notes||{}),...Object.entries(ev.rejected||{}).map(([k,v])=>k+': '+v)];
+  card.innerHTML=`<b>설정을 이렇게 바꿀까요?</b>${ev.reason?`<p class="why">${esc(ev.reason)}</p>`:''}<ul>${li}</ul>${extra.length?`<p class="warn">${extra.map(esc).join('<br>')}</p>`:''}<div class="btns"><button type="button" class="ok">적용하기</button><button type="button" class="no">취소</button></div>`;
+  msgs.appendChild(card);msgs.scrollTop=msgs.scrollHeight;
+  card.querySelector('.ok').focus();
+  const decide=async approve=>{
+    const before=deskSim.getState();
+    const result=approve?deskSim.applyPatch(ev.patch):{};
+    const box=card.querySelector('.btns');
+    box.outerHTML=approve
+      ?`<div class="done"><span>적용했어요 (${Object.keys(result.applied||{}).length}개)</span><button type="button" class="undo">되돌리기</button></div>`
+      :'<div class="done"><span>취소했어요</span></div>';
+    const undo=card.querySelector('.undo');
+    if(undo)undo.addEventListener('click',()=>{deskSim.loadState(before);undo.parentNode.innerHTML='<span>되돌렸어요</span>'});
+    const next=await run('/api/chat/approve',{thread_id:ev.thread_id,approve,result,checks:deskSim.getChecks()});
+    next?showApproval(next):finishTurn();
+  };
+  card.querySelector('.ok').addEventListener('click',()=>decide(true));
+  card.querySelector('.no').addEventListener('click',()=>decide(false));
+}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* 스트림 한 번을 읽어 화면에 그린다. 승인 대기 이벤트가 오면 그것을 돌려주고, 아니면 null */
+async function run(url,body){
+  const status=add('msg-step','…');let bubble=null,approval=null,gap=false;
   try{
-    const res=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question,history:history.slice(-10),state:deskSim.getState(),checks:deskSim.getChecks()})});
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(!res.ok||!res.body)throw new Error('HTTP '+res.status);
     const reader=res.body.getReader(),dec=new TextDecoder();let buf='';
     for(;;){
@@ -1105,16 +1156,21 @@ async function send(question){
         const line=buf.slice(0,i).trim();buf=buf.slice(i+2);
         if(!line.startsWith('data:'))continue;
         const ev=JSON.parse(line.slice(5));
-        if(ev.type==='step'&&ev.phase==='start')status.textContent=ev.label+'…';
-        else if(ev.type==='step')status.textContent=ev.label+' · '+(ev.detail||'완료');
-        else if(ev.type==='token'){if(!bubble){bubble=add('msg ai','')}answer+=ev.text;bubble.textContent=answer;msgs.scrollTop=msgs.scrollHeight}
-        else if(ev.type==='done'){answer=ev.message}
-        else if(ev.type==='error'){failed=true;add('msg err',ev.message)}
+        if(ev.type==='step'&&ev.phase==='start'){status.textContent=ev.label+'…';gap=true}
+        else if(ev.type==='step'){status.textContent=ev.label+' · '+(ev.detail||'완료');gap=true}
+        else if(ev.type==='token'){
+          let t=ev.text;
+          if(!bubble){bubble=add('msg ai','');if(turn.text)turn.text+='\n'}
+          else if(gap&&!/\s$/.test(bubble.textContent))t='\n'+t; // 도구를 거치며 끊긴 앞뒤 문장이 붙지 않게
+          gap=false;turn.text+=t;bubble.textContent+=t;msgs.scrollTop=msgs.scrollHeight}
+        else if(ev.type==='approval'){approval=ev}
+        else if(ev.type==='done'){if(!bubble&&ev.message){add('msg ai',ev.message);turn.text+=(turn.text?'\n':'')+ev.message}}
+        else if(ev.type==='error'){turn.failed=true;add('msg err',ev.message)}
       }
     }
-  }catch(e){failed=true;add('msg err','서버와 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.')}
-  if(!failed&&answer){history.push({role:'user',content:question},{role:'assistant',content:answer})}
-  setBusy(false);
+  }catch(e){turn.failed=true;add('msg err','서버와 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.')}
+  status.remove();
+  return approval;
 }
 
 $('#chatForm').addEventListener('submit',e=>{e.preventDefault();send(input.value)});
@@ -1122,8 +1178,8 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(120,input.scrollHeight)+'px'});
 $('#starters').innerHTML=STARTERS.map(t=>`<button type="button">${t}</button>`).join('');
 $('#starters').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>send(b.textContent)));
-add('msg ai','안녕하세요! 지금 꾸며 둔 책상 셋업을 보고 평가하고 조언해 드려요. 아직은 설명만 하고, 직접 바꾸는 기능은 준비 중이에요.');
-setOpen(matchMedia('(min-width:881px)').matches);
+add('msg ai','안녕하세요! 지금 꾸며 둔 책상 셋업을 보고 평가하고 조언해 드려요. "책상 가로를 1600으로 해줘"처럼 말하면 바꿀 내용을 보여 드리고, 승인하면 적용해요.');
+setOpen(matchMedia('(min-width:1200px)').matches);
 })();
 </script>
 </body>

@@ -56,7 +56,12 @@ def describe(state: dict, checks: list[dict]) -> str:
     if s.get("room"):
         lines.append(f"방: {s.get('roomW')}mm × {s.get('roomD')}mm, 천장 {s.get('roomH')}mm")
     if checks:
-        lines.append("\n점검 결과(시뮬레이터가 계산한 값):")
-        for c in checks:
-            lines.append(f"- [{STATUS.get(c.get('status'), c.get('status'))}] {c.get('title')}: {c.get('value')} — {c.get('note')}")
+        lines.append("\n" + describe_checks(checks))
+    return "\n".join(lines)
+
+
+def describe_checks(checks: list[dict]) -> str:
+    lines = ["점검 결과(시뮬레이터가 계산한 값):"]
+    for c in checks:
+        lines.append(f"- [{STATUS.get(c.get('status'), c.get('status'))}] {c.get('title')}: {c.get('value')} — {c.get('note')}")
     return "\n".join(lines)
