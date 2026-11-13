@@ -1428,7 +1428,7 @@ async function send(question){
   $('#starters').hidden=true;
   add('msg user',question);input.value='';input.style.height='auto';setBusy(true);
   turn={q:question,text:'',failed:false};
-  const ap=await run('/api/chat/stream',{question,history:history.slice(-10),state:deskSim.getState(),checks:deskSim.getChecks(),settings_schema:deskSim.schema(),collections:deskSim.collections(),slots:deskSim.slots()});
+  const ap=await run('/api/chat/stream',{question,history:history.slice(-40),state:deskSim.getState(),checks:deskSim.getChecks(),settings_schema:deskSim.schema(),collections:deskSim.collections(),slots:deskSim.slots()});
   ap?showApproval(ap):finishTurn();
 }
 function showApproval(ev){

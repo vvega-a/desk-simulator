@@ -24,7 +24,7 @@ from src.agent import graph as agent
 from src.core import config
 
 STATIC_DIR = Path(__file__).parent / "static"
-MAX_HISTORY = 10  # 대화 맥락으로 LLM에 넘기는 최근 메시지 수
+MAX_HISTORY = 40  # 받는 대화 기록 수. 최근 10개는 원문, 그보다 오래된 것은 요약해서 LLM에 넘긴다(src/agent/memory.py)
 
 
 class ToolTrace(BaseModel):

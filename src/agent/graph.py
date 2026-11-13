@@ -1,9 +1,14 @@
-"""데스크 셋업 에이전트 그래프(LangGraph): ReAct 도구 호출 + 사람 승인.
+"""데스크 셋업 에이전트 그래프(LangGraph): ReAct 도구 호출 + 사람 승인 + 입력·출력 가드레일.
 
-  context ─► agent ─┬─ 도구 호출 없음 ─► END
-                    └─ 도구 호출 있음 ─► act ─► agent ...   (최대 MAX_LOOPS번)
+  context ─┬─ 프롬프트 인젝션 ─► shield ─► END            (LLM을 부르지 않는다)
+           └─► agent ─┬─ 도구 호출 없음 ─► END
+                      └─ 도구 호출 있음 ─► act ─► agent ...   (최대 MAX_LOOPS번)
 
-  context: 상태·점검 결과를 글로 정리하고 대화를 메시지로 만든다(코드, LLM 없음)
+  context: 상태·점검 결과를 글로 정리하고 대화를 메시지로 만든다. 미들웨어 역할도 한다.
+           - 질문·이전 대화의 개인정보를 가린다(src/core/guard.py)
+           - 인젝션 질문을 규칙으로 잡아 shield로 보낸다
+           - 오래된 대화는 요약해 시스템 프롬프트 뒤에 붙인다(src/agent/memory.py, 요약할 때만 LLM 호출)
+  shield : 인젝션 질문에 고정 안내만 한다
   agent  : LLM이 답하거나 도구를 고른다(문장 단위로 스트리밍)
   act    : 도구를 실행한다.
            list_settings   바로 실행(읽기)
@@ -15,7 +20,7 @@
 
 스트리밍 이벤트(custom 스트림):
   {"type": "step", "phase": "start" | "done", "node": 노드, "label": 이름, "detail"?: 설명}
-  {"type": "token", "text": 답변 조각}
+  {"type": "token", "text": 답변 조각}   (개인정보는 내보내기 전에 한 번 더 가린다)
   {"type": "client_action", "action": "set_view", "view"?, "auto_rotate"?}   (브라우저가 바로 실행)
   {"type": "approval", "thread_id", "reason", "changes", "patch", "rejected", "notes"}   (승인 대기, 호출이 여기서 끝남)
 """
@@ -25,6 +30,8 @@ import uuid
 from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import Runnable, RunnableLambda
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -32,10 +39,12 @@ from langgraph.graph.message import add_messages
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
+from src.agent import memory
 from src.agent.context import describe, describe_checks, describe_collections
 from src.agent.settings import (
     BAD_VALUE_PREFIX, VIEW_NAMES, diff_items, format_settings, validate_ops, validate_patch, validate_scene_action,
 )
+from src.core import guard
 from src.rag.retriever import format_hits
 
 MAX_LOOPS = 6  # agent가 도구를 부르며 돌 수 있는 최대 횟수
@@ -72,7 +81,7 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 현재 셋업:
 {context}"""
 
-STEP_LABELS = {"context": "셋업 읽기", "agent": "생각하기", "act": "도구 실행"}
+STEP_LABELS = {"context": "셋업 읽기", "agent": "생각하기", "act": "도구 실행", "shield": "안전 점검"}
 
 
 class ListSettings(BaseModel):
@@ -141,6 +150,7 @@ class AgentState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
     loops: int
     answer: str
+    blocked: bool  # 프롬프트 인젝션으로 보여 LLM 없이 막았는가
     declined: bool  # 이번 요청에서 사용자가 변경 제안을 거절했는가(그러면 같은 요청에서 다시 제안하지 않는다)
 
 
@@ -172,11 +182,12 @@ def _stream_reply(llm, messages: list) -> AIMessage:
         while (m := _BOUNDARY.search(buf)):
             segment, buf = buf[: m.end()], buf[m.end():]
             if segment.strip():
-                _emit({"type": "token", "text": segment})
+                _emit({"type": "token", "text": guard.redact(segment)})  # 출력 가드: LLM이 개인정보를 말해도 가린다
     if buf.strip():
-        _emit({"type": "token", "text": buf})
+        _emit({"type": "token", "text": guard.redact(buf)})
     # 본문은 문자열로만 보관한다. 도구 호출은 tool_calls로 따로 들고 있어 다시 보낼 때 중복되지 않는다
-    return AIMessage(content=_text_of(full) if full is not None else "", tool_calls=list(getattr(full, "tool_calls", None) or []))
+    content = guard.redact(_text_of(full)) if full is not None else ""
+    return AIMessage(content=content, tool_calls=list(getattr(full, "tool_calls", None) or []))
 
 
 REJECTED_TEXT = "사용자가 거절했어요. 아무것도 적용하지 않았어요."
@@ -195,13 +206,13 @@ def _history_messages(history: list[dict]) -> list:
     out: list = []
     for i, m in enumerate(history):
         if m["role"] == "user":
-            out.append(HumanMessage(m["content"]))
+            out.append(HumanMessage(guard.redact(m["content"])))
             continue
         for n, t in enumerate(m.get("tools") or []):
             call_id = f"h{i}_{n}"
             out.append(AIMessage(content="", tool_calls=[{"name": t["name"], "args": t.get("args") or {}, "id": call_id}]))
             out.append(ToolMessage(t.get("result") or "", tool_call_id=call_id))
-        out.append(AIMessage(m["content"]))
+        out.append(AIMessage(guard.redact(m["content"])))
     return out
 
 
@@ -239,7 +250,7 @@ def _outcome_text(decision: dict, problems: list[str]) -> str:
 
 def _ask_approval(reason: str, items: list[dict], patch: dict, rejected: dict, notes: dict, problems: list[str]) -> str:
     """승인 카드를 띄우고 멈춘다. 취소면 그 사실을, 승인되면 적용 결과 글을 돌려준다."""
-    decision = interrupt({"reason": reason, "changes": items, "patch": patch, "rejected": rejected, "notes": notes, "problems": problems})
+    decision = interrupt({"reason": guard.redact(reason), "changes": items, "patch": patch, "rejected": rejected, "notes": notes, "problems": problems})
     if not decision.get("approve"):
         _step_done("act", "제안을 사용자가 취소했어요")
         return REJECTED_TEXT
@@ -318,19 +329,62 @@ def _search_guides(retriever, args: dict) -> str:
     return format_hits(hits, query)
 
 
-def build_graph(llm, checkpointer=None, retriever=None):
+SUMMARY_HEADER = "\n\n앞선 대화 요약(오래된 대화라 원문은 빠짐. 적용 여부는 이 요약이 아니라 도구 결과와 현재 셋업으로 판단해):\n"
+
+
+def default_summarizer(llm):
+    """LCEL 요약 체인: 프롬프트 | LLM | 글 추출. Runnable이 아닌 LLM(테스트의 가짜 LLM)이면 None — 요약 없이 최근 대화만 쓴다."""
+    if not isinstance(llm, Runnable):
+        return None
+    return PromptTemplate.from_template(memory.SUMMARY_PROMPT) | llm | RunnableLambda(_text_of)
+
+
+def _summarize(summarizer, older: list[dict]) -> str:
+    """오래된 대화 요약. 같은 구간은 캐시를 쓰고, 처음 요약할 때만 LLM을 부른다. 실패하면 요약 없이 진행한다."""
+    if not older or summarizer is None:
+        return ""
+    key = memory.cache_key(older)
+    summary = memory.cached(key)
+    if summary is None:
+        try:
+            summary = guard.redact(str(summarizer.invoke({"conversation": memory.format_lines(older)})).strip())
+        except Exception:  # 요약이 안 돼도 답변은 해야 한다. 최근 대화만으로 계속한다
+            return ""
+        memory.store(key, summary)
+    return summary
+
+
+def build_graph(llm, checkpointer=None, retriever=None, summarizer="default"):
     """llm: ChatBedrockConverse 호환(bind_tools와 stream을 가진 객체). checkpointer는 interrupt에 필요해서 기본으로 메모리를 쓴다.
-    retriever: 가이드 문서 검색기(src.rag.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다."""
+    retriever: 가이드 문서 검색기(src.rag.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다.
+    summarizer: 오래된 대화 요약 Runnable({conversation} → 글). 기본은 llm으로 만든 LCEL 체인, None이면 요약하지 않는다."""
     tool_llm = llm.bind_tools([ListSettings, SearchGuides, ProposeChanges, SceneAction, SetView])
+    if summarizer == "default":
+        summarizer = default_summarizer(llm)
 
     def context(state: AgentState) -> AgentState:
         _emit({"type": "step", "phase": "start", "node": "context", "label": STEP_LABELS["context"]})
+        raw_q = state["question"]
+        if guard.looks_like_injection(raw_q):
+            _step_done("context", "지시를 바꾸려는 요청으로 보여 LLM에 보내지 않았어요")
+            return {"blocked": True, "messages": [], "loops": 0, "answer": "", "declined": False}
         text = describe(state.get("desk_state") or {}, state.get("checks") or [], state.get("slots") or {}, state.get("collections") or {})
-        messages = [SystemMessage(SYSTEM_PROMPT.format(context=text))]
-        messages += _history_messages(state.get("history") or [])
-        messages.append(HumanMessage(state["question"]))
-        _step_done("context", f"점검 항목 {len(state.get('checks') or [])}개를 읽었어요")
-        return {"context": text, "messages": messages, "loops": 0, "answer": "", "declined": False}
+        older, recent = memory.plan(state.get("history") or [])
+        summary = _summarize(summarizer, older)
+        system = SYSTEM_PROMPT.format(context=text) + (SUMMARY_HEADER + summary if summary else "")
+        question = guard.redact(raw_q)  # 입력 가드: 개인정보는 LLM에 보내기 전에 가린다
+        messages = [SystemMessage(system)] + _history_messages(recent) + [HumanMessage(question)]
+        notes = [f"점검 항목 {len(state.get('checks') or [])}개를 읽었어요"]
+        if summary:
+            notes.append(f"앞선 대화 {len(older)}개를 요약했어요")
+        if question != raw_q:
+            notes.append("질문 속 개인정보를 가리고 보냈어요")
+        _step_done("context", " · ".join(notes))
+        return {"context": text, "messages": messages, "loops": 0, "answer": "", "declined": False, "blocked": False}
+
+    def shield(state: AgentState) -> AgentState:
+        _emit({"type": "token", "text": guard.INJECTION_NOTICE})
+        return {"answer": guard.INJECTION_NOTICE}
 
     def agent(state: AgentState) -> AgentState:
         _emit({"type": "step", "phase": "start", "node": "agent", "label": STEP_LABELS["agent"]})
@@ -381,6 +435,9 @@ def build_graph(llm, checkpointer=None, retriever=None):
         _emit({"type": "token", "text": text})
         return {"answer": text}
 
+    def after_context(state: AgentState) -> str:
+        return "shield" if state.get("blocked") else "agent"
+
     def route(state: AgentState) -> str:
         if not state["messages"][-1].tool_calls:
             return END
@@ -391,8 +448,10 @@ def build_graph(llm, checkpointer=None, retriever=None):
     g.add_node("agent", agent)
     g.add_node("act", act)
     g.add_node("stop", stop)
+    g.add_node("shield", shield)
     g.add_edge(START, "context")
-    g.add_edge("context", "agent")
+    g.add_conditional_edges("context", after_context, ["agent", "shield"])
+    g.add_edge("shield", END)
     g.add_conditional_edges("agent", route, ["act", "stop", END])
     g.add_edge("act", "agent")
     g.add_edge("stop", END)
