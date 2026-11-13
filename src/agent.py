@@ -1,14 +1,14 @@
 """데스크 셋업 에이전트 그래프(LangGraph): ReAct 도구 호출 + 사람 승인 + 입력·출력 가드레일.
 
-  context ─┬─ 프롬프트 인젝션 ─► shield ─► END            (LLM을 부르지 않는다)
+  context ─┬─ 프롬프트 인젝션·범위 밖 요청 ─► shield ─► END   (LLM을 부르지 않는다)
            └─► agent ─┬─ 도구 호출 없음 ─► END
                       └─ 도구 호출 있음 ─► act ─► agent ...   (최대 MAX_LOOPS번)
 
   context: 상태·점검 결과를 글로 정리하고 대화를 메시지로 만든다. 미들웨어 역할도 한다.
            - 질문·이전 대화의 개인정보를 가린다(src/guard.py)
-           - 인젝션 질문을 규칙으로 잡아 shield로 보낸다
+           - 인젝션 질문과 범위 밖 요청(날씨·코드·주가 등)을 규칙으로 잡아 shield로 보낸다
            - 오래된 대화는 요약해 시스템 프롬프트 뒤에 붙인다(src/memory.py, 요약할 때만 LLM 호출)
-  shield : 인젝션 질문에 고정 안내만 한다
+  shield : 막은 질문에 고정 안내만 한다(인젝션·범위 밖 각각 다른 안내)
   agent  : LLM이 답하거나 도구를 고른다(문장 단위로 스트리밍)
   act    : 도구를 실행한다.
            list_settings   바로 실행(읽기)
@@ -167,7 +167,8 @@ class AgentState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
     loops: int
     answer: str
-    blocked: bool  # 프롬프트 인젝션으로 보여 LLM 없이 막았는가
+    blocked: bool  # 프롬프트 인젝션·범위 밖 요청으로 보여 LLM 없이 막았는가
+    notice: str  # 막았을 때 shield가 내보낼 고정 안내
     declined: bool  # 이번 요청에서 사용자가 변경 제안을 거절했는가(그러면 같은 요청에서 다시 제안하지 않는다)
 
 
@@ -397,7 +398,10 @@ def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", sh
         raw_q = state["question"]
         if guard.looks_like_injection(raw_q):
             _step_done("context", "지시를 바꾸려는 요청으로 보여 LLM에 보내지 않았어요")
-            return {"blocked": True, "messages": [], "loops": 0, "answer": "", "declined": False}
+            return {"blocked": True, "notice": guard.INJECTION_NOTICE, "messages": [], "loops": 0, "answer": "", "declined": False}
+        if guard.looks_off_topic(raw_q):  # 범위 밖 요청도 프롬프트가 아니라 코드로 막는다
+            _step_done("context", "데스크 셋업과 관계없는 요청으로 보여 LLM에 보내지 않았어요")
+            return {"blocked": True, "notice": guard.OFF_TOPIC_NOTICE, "messages": [], "loops": 0, "answer": "", "declined": False}
         text = describe(state.get("desk_state") or {}, state.get("checks") or [], state.get("slots") or {}, state.get("collections") or {})
         older, recent = memory.plan(state.get("history") or [])
         summary = _summarize(summarizer, older)
@@ -418,8 +422,9 @@ def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", sh
         return {"context": text, "messages": messages, "loops": 0, "answer": "", "declined": False, "blocked": False}
 
     def shield(state: AgentState) -> AgentState:
-        _emit({"type": "token", "text": guard.INJECTION_NOTICE})
-        return {"answer": guard.INJECTION_NOTICE}
+        notice = state.get("notice") or guard.INJECTION_NOTICE
+        _emit({"type": "token", "text": notice})
+        return {"answer": notice}
 
     def agent(state: AgentState) -> AgentState:
         _emit({"type": "step", "phase": "start", "node": "agent", "label": STEP_LABELS["agent"]})

@@ -1,4 +1,4 @@
-"""Bedrock 없이 도는 가드레일·미들웨어 테스트: 개인정보 마스킹, 프롬프트 인젝션 차단, 오래된 대화 요약."""
+"""Bedrock 없이 도는 가드레일·미들웨어 테스트: 개인정보 마스킹, 프롬프트 인젝션·범위 밖 요청 차단, 오래된 대화 요약."""
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableLambda
@@ -73,6 +73,43 @@ def test_injection_is_answered_without_calling_the_llm():
     assert llm.calls == []
     assert events[-1]["type"] == "result" and events[-1]["answer"] == guard.INJECTION_NOTICE
     assert any(e["type"] == "token" and e["text"] == guard.INJECTION_NOTICE for e in events)
+
+
+# ---- 범위 밖 요청 ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("q", [
+    "오늘 서울 날씨 알려줘", "파이썬으로 피보나치 수열 함수 짜줘", "삼성전자 주가 지금 얼마야?", "우리 고양이 건강검진 기록 요약해줘",
+    "이 문장 영어로 번역해줘", "김치찌개 레시피 알려줘", "자기소개서 써줘", "요즘 볼만한 영화 추천해줘", "Write a Python script",
+])
+def test_off_topic_is_detected(q):
+    assert guard.looks_off_topic(q)
+
+
+@pytest.mark.parametrize("q", [
+    "삼성전자 모니터 찾아줘", "코딩할 때 좋은 키보드 배열은?", "영화 볼 때 좋은 모니터 각도는?", "고양이가 책상에 올라와도 되게 넓혀줘",
+    "게임할 때 좋은 배치 알려줘", "목이 아파", "어때?", "응 그렇게 해줘", "다음은?", "",
+])
+def test_setup_requests_are_not_off_topic(q):
+    assert not guard.looks_off_topic(q)
+
+
+def test_eval_set_out_cases_are_blocked_and_in_cases_pass():
+    """평가 세트 기준: 범위 밖(out_*) 질문은 모두 코드가 막고, 정상·guardrail 질문은 하나도 막지 않는다."""
+    from src.evaluate import load_cases
+    for c in load_cases():
+        q = c["question"]
+        blocked = guard.looks_like_injection(q) or guard.looks_off_topic(q)
+        assert blocked == (c["category"] == "out"), c["id"]
+
+
+def test_off_topic_is_answered_without_calling_the_llm():
+    llm = FakeLLM(text("서울은 맑아요."))
+    events = events_of(llm, "오늘 서울 날씨 알려줘")
+    assert llm.calls == []
+    assert events[-1]["type"] == "result" and events[-1]["answer"] == guard.OFF_TOPIC_NOTICE
+    assert events[-1]["tools"] == []
+    assert any(e["type"] == "token" and e["text"] == guard.OFF_TOPIC_NOTICE for e in events)
+    assert any("관계없는 요청" in d for d in step_details(events))
 
 
 # ---- 입력·출력 가드 -----------------------------------------------------------------------

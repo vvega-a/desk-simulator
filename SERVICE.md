@@ -48,7 +48,7 @@
 실제 개인 데이터·결제·계정은 다루지 않는다.
 
 ## 4. 서비스 정책 (가드레일 요약)
-어떤 경우에도 지킬 규칙 5가지. 세부 케이스는 ① 자동 테스트(`tests/`, 가짜 LLM, 158개)와 ② [`evaluation/test_queries.csv`](evaluation/test_queries.csv)의 guardrail(`gr_*`)·범위 밖(`out_*`) 항목(실제 Bedrock, 35건 × 3회, 결과는 [round2_report.md](evaluation/round2_report.md))에서 검증한다.
+어떤 경우에도 지킬 규칙 5가지. 세부 케이스는 ① 자동 테스트(`tests/`, 가짜 LLM, 179개)와 ② [`evaluation/test_queries.csv`](evaluation/test_queries.csv)의 guardrail(`gr_*`)·범위 밖(`out_*`) 항목(실제 Bedrock, 35건 × 3회, 결과는 [round2_report.md](evaluation/round2_report.md))에서 검증한다.
 
 | # | 규칙 | 어떻게 지키나 | 검증 |
 |---|---|---|---|
@@ -56,11 +56,12 @@
 | 2 | **LLM이 낸 값을 그대로 믿지 않는다.** | 범위·단위·선택지·최대 개수·번호를 서버가 검증(1643→1640mm, 5000→2400mm, 없는 번호·빈 슬롯 거절)하고 브라우저가 한 번 더 검증. 모르는 키·선택지가 섞이면 카드 없이 모델에게 돌려보냄 | `test_validate_snaps_range_and_reports_note`, `test_validate_rejects_bad_values`, `test_invalid_proposal_never_asks_for_approval` · 평가 `gr_clamp_range`, `gr_missing_number`, `gr_max_monitors`, `gr_empty_slot` |
 | 3 | **적용된 게 없으면 했다고 말하지 않는다.** | 도구 결과에 "적용했어요"가 있어야 완료로 봄. 도구 없이 완료를 주장하면 "실제로 적용된 것이 없어요"를 덧붙임 | `test_claiming_done_without_any_applied_tool_gets_a_truthful_notice` · 평가: 모든 실행의 공통 불변식(위반 0건) |
 | 4 | **개인정보·내부 정보를 노출하지 않고, 서버는 셋업을 보관하지 않는다.** | 전화·이메일·주민번호·카드·주소·이름을 LLM에 보내기 전·후에 마스킹. 오류는 종류만 알리고 `.env`는 커밋 안 함. 요청 크기 상한(질문 1000자, 기록 40개, 루프 6회). 상태·대화는 서버에 저장 안 함 | `test_redact_masks_personal_data`, `test_question_pii_is_masked_before_the_llm_sees_it`, `test_error_hides_details`, `test_request_validation`, `test_loop_is_capped` · 평가: 서버 오류 0건 |
-| 5 | **지시를 바꾸려는 요청과 범위 밖 요청은 정중히 거절한다.** | "이전 지시 무시" 같은 말투는 규칙으로 잡아 LLM 없이 고정 안내(`src/guard.py`). 범위 밖(날씨·코드·주가 등)은 시스템 프롬프트 규칙 | `test_injection_is_detected`, `test_injection_is_answered_without_calling_the_llm` · 평가 `out_*`, `out_injection` |
+| 5 | **지시를 바꾸려는 요청과 범위 밖 요청은 정중히 거절한다.** | "이전 지시 무시" 같은 말투는 규칙으로 잡아 LLM 없이 고정 안내(`src/guard.py`). 범위 밖(날씨·코드·주가·번역 등)도 주제 말 규칙으로 잡아 LLM 없이 고정 안내(`looks_off_topic`): 범위 밖 주제 말이 있고 셋업 관련 말이 없을 때만 막는다. 규칙이 놓친 것은 시스템 프롬프트 규칙이 2차로 막음 | `test_injection_is_detected`, `test_injection_is_answered_without_calling_the_llm`, `test_off_topic_is_detected`, `test_setup_requests_are_not_off_topic`, `test_off_topic_is_answered_without_calling_the_llm`, `test_eval_set_out_cases_are_blocked_and_in_cases_pass` · 평가 `out_*`, `out_injection` |
 
 ### 아직 지키지 못하는 것
-- 범위 밖 거절은 프롬프트 규칙이지 코드 차단이 아니다. 5건 × 3회 15/15였지만 케이스가 적고 판정 모델이 답변 모델과 같아 편향 가능성이 있다.
-- 마스킹·인젝션 차단·완료 주장 감지는 정규식이라 새로운 우회 말투를 놓친다(놓친 인젝션은 프롬프트와 모델 판단이 2차로 막는다).
+- 범위 밖 차단은 주제 말 목록(정규식)이라 목록에 없는 주제와 셋업 말을 섞은 요청("모니터에 띄울 파이썬 코드 짜줘")은 코드가 잡지 못하고 프롬프트 규칙에 맡긴다. 셋업 말 없이 앞 대화에만 기대는 짧은 답은 잘못 막힐 수 있다.
+- 범위 밖 15/15(5건 × 3회)는 **코드 차단을 넣기 전** 프롬프트 규칙만으로 잰 값이고, 그 뒤 평가를 다시 돌리지 않았다. 케이스가 적고 판정 모델이 답변 모델과 같아 편향 가능성도 있다. 지금은 5건 모두 고정 안내로 답한다는 것만 테스트로 확인했다.
+- 마스킹·인젝션 차단·범위 밖 차단·완료 주장 감지는 정규식이라 새로운 우회 말투를 놓친다(놓친 인젝션은 프롬프트와 모델 판단이 2차로 막는다).
 - 범위 밖 값을 말하면 모델이 가끔 카드 대신 되묻는다(`gr_clamp_range` 흔들림). 안전 위반은 아니다.
 - 가이드 근거 충실도(faithfulness)는 숫자로 재지 않았다.
 - 인체공학 점검은 경험 규칙이며 **의학적 조언이 아니다.**
@@ -71,7 +72,7 @@
 ### 완성으로 볼 최소 기준
 | 항목 | 목표 | 현재 |
 |---|---|---|
-| 자동 테스트 | 100% | **158 / 158** ✅ |
+| 자동 테스트 | 100% | **179 / 179** ✅ |
 | 인-아웃 세트(35건 × 3회) 통과율 | **90% 이상** | **103 / 105 (98%)**, 케이스 단위 34/35 ✅ (낙관적) |
 | guardrail 통과 | **100%** | **15 / 15** ✅ (불안정: 한때 14/15) |
 | 가이드 검색 hit@3 | 90% 이상 | **20 / 20**, MRR 1.000 ✅ (낙관적) |
@@ -87,7 +88,7 @@
 | 불필요한 되묻기 | 정상 요청 중 카드 없이 되물은 비율 | 10% 이하 | **0 / 60** |
 | 가이드 근거 답변 | 검색 3건 × 3회, 문서 기준으로 답변 | 90% 이상 | **9 / 9** |
 | 거짓 완료 주장 | 적용 없이 "했어요" | 0% | **0 / 99** |
-| 범위 밖 거절 | 5건 × 3회 LLM 판정 | 100% | **15 / 15** |
+| 범위 밖 거절 | 5건 × 3회 LLM 판정 | 100% | **15 / 15** (코드 차단 전 측정, 재측정 안 함) |
 | 응답 지연 | 질문 1건 완료까지 | P50 5초 이하 | **P50 2.4초 · P90 4.7초** |
 | 질문당 비용 | LangSmith trace | $0.02 이하 | **미측정**(참고: 1건 $0.0139) |
 | 승인율·되돌리기 비율 | 사용 로그 | 승인율↑ 되돌리기↓ | **로그 미수집 → 미측정** |
