@@ -277,8 +277,9 @@ const KB_NAME={none:'없음',full:'풀배열',tkl:'텐키리스',75:'75%',65:'65
 const DEFAULTS={deskW:1400,deskD:700,deskH:720,deskColor:'#f3f0ea',frameColor:'#ecebe7',
   mon:'27',curved:false,mount:'stand',monBack:200,monLift:100,
   kb:'tkl',theme:'white',mouse:true,mat:'900x400',matColor:'#e9dfd2',
-  laptop:'none',tower:'none',speakers:false,chair:false,userH:175,dims:true,extraDesks:[],drawers:[],
+  laptop:'none',tower:'none',speakers:false,chair:false,chairColor:'#2c2d31',userH:175,dims:true,extraDesks:[],drawers:[],
   room:false,roomW:3000,roomD:3300,roomH:2300,roomRot:0,roomX:0,roomGap:0,wallColor:'#f4f2ee',floorColor:'#d9b98f',win:true,winW:1500,winX:0,door:true,doorWall:'right',lapSide:'left',lapSize:'14',lapAngle:17,monX:0,armX:0,sets:[],pegs:[],monitors:[]};
+const CHAIR_COLORS=[{v:'#2c2d31',l:'블랙'},{v:'#8f9296',l:'그레이'},{v:'#f3f0ea',l:'화이트'},{v:'#2c3a5a',l:'네이비'},{v:'#9bb3a1',l:'세이지'},{v:'#8a5a3c',l:'브라운'}];
 const PEG_COLORS=[{v:'#f2f1ed',l:'화이트'},{v:'#26272a',l:'블랙'},{v:'#9ea2a6',l:'그레이'},{v:'#c9a57c',l:'우드'},{v:'#bcd6cc',l:'민트'}];
 const PF=[{k:'w',t:'가로',min:300,max:2400,step:10},{k:'h',t:'세로',min:200,max:1400,step:10},{k:'lift',t:'책상 위로 띄우기',min:0,max:900,step:10},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10}];
 const SF=[{k:'yaw',t:'모니터 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)',min:-60,max:60,step:1,unit:'°'},{k:'lapAng',t:'노트북 안쪽으로 꺾는 각도',min:0,max:70,step:1,unit:'°'},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10},{k:'lift',t:'모니터 하단 높이',min:0,max:450,step:5},{k:'back',t:'화면 위치 (책상 뒤 끝 → 화면)',min:60,max:500,step:10}];
@@ -339,6 +340,7 @@ const UI=[
   {k:'tower',t:'PC 본체 (미들타워)',type:'seg',opts:[{v:'none',l:'없음'},{v:'deskL',l:'책상 왼쪽'},{v:'deskR',l:'책상 오른쪽'},{v:'floor',l:'바닥'}]},
   {k:'speakers',t:'북쉘프 스피커',type:'toggle'},
   {k:'chair',t:'의자 (크기 비교용)',type:'toggle'},
+  {k:'chairColor',t:'의자 색',type:'swatch',opts:CHAIR_COLORS,when:()=>S.chair},
   {k:'userH',t:'내 키',type:'range',min:145,max:200,step:1,unit:'cm'},
   {k:'dims',t:'치수선 표시',type:'toggle'},
  ]},
@@ -365,7 +367,7 @@ const ITEM_DEFS=[
   {id:'laptop',label:'노트북',keys:['laptop'],on:()=>S.laptop!=='none',add:()=>set('laptop','14'),remove:()=>set('laptop','none'),sum:()=>`${S.laptop}"`},
   {id:'tower',label:'PC 본체',keys:['tower'],on:()=>S.tower!=='none',add:()=>set('tower','deskR'),remove:()=>set('tower','none'),sum:()=>TOWER_NAME[S.tower]},
   {id:'speakers',label:'스피커',keys:[],note:'북쉘프 스피커는 모니터 양옆에 자동으로 놓여요. 색은 키보드·마우스 색을 따라가요.',on:()=>S.speakers,add:()=>set('speakers',true),remove:()=>set('speakers',false),sum:()=>'북쉘프 2개'},
-  {id:'chair',label:'의자',keys:[],note:'책상 앞에 놓여요. 크기는 「내 키 · 표시」의 키에 맞춰 그려져요.',on:()=>S.chair,add:()=>set('chair',true),remove:()=>set('chair',false),sum:()=>`키 ${S.userH}cm 기준`},
+  {id:'chair',label:'의자',keys:['chairColor'],note:'책상 앞에 놓여요. 크기는 「내 키 · 표시」의 키에 맞춰 그려져요.',on:()=>S.chair,add:()=>set('chair',true),remove:()=>set('chair',false),sum:()=>`키 ${S.userH}cm 기준`},
   {id:'room',label:'방',keys:['roomW','roomD','roomH','roomRot','roomX','roomGap','wallColor','floorColor','win','winW','winX','door','doorWall'],on:()=>S.room,add:()=>set('room',true),remove:()=>set('room',false),sum:()=>`${S.roomW}×${S.roomD}${S.win?' · '+ROOM_ROT[roomRot()]:''}`},
 ];
 ARR.forEach(a=>{a.item=a.item||a.label}); // item = 화면에 보이는 이름(번호 앞). 번호는 i+first로 화면·채팅·카드가 모두 같다
@@ -1092,7 +1094,7 @@ function buildSpeaker(theme){
   return g;
 }
 function buildChair(seatH){
-  const g=new THREE.Group(),dark=M('#2c2d31',{r:.75}),metal=M('#9a9da2',{r:.35,m:.6});
+  const g=new THREE.Group(),dark=M(S.chairColor||'#2c2d31',{r:.75}),metal=M('#9a9da2',{r:.35,m:.6});
   for(let i=0;i<5;i++){const a=i*2*Math.PI/5;const l=box(300,25,40,metal);l.position.set(Math.cos(a)*150,62,Math.sin(a)*150);l.rotation.y=-a;g.add(l);g.add(at(new THREE.Mesh(new THREE.SphereGeometry(28,16,12),dark),Math.cos(a)*290,28,Math.sin(a)*290))}
   g.add(cylBetween(V(0,70,0),V(0,seatH-60,0),22,metal));
   g.add(at(slab(500,480,70,70,dark),0,seatH-70,0));
