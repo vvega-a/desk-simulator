@@ -77,6 +77,31 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .ck.ok{--c:var(--ok)} .ck.warn{--c:var(--warn)} .ck.bad{--c:var(--bad)} .ck.info{--c:var(--accent)}
 .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:14px;text-align:center;padding:20px}
 
+.app.chat-open{grid-template-columns:350px 1fr 360px}
+.chat{display:none;flex-direction:column;min-height:0;background:#fff;border-left:1px solid var(--line)}
+.app.chat-open .chat{display:flex}
+.chat-head{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 12px 12px 18px;border-bottom:1px solid var(--line)}
+.chat-head h2{margin:0;font-size:16px;font-weight:800;letter-spacing:-.01em}
+.chat-head p{margin:4px 0 0;font-size:12px;color:var(--sub)}
+.chat-close{border:0;background:none;font-size:20px;line-height:1;min-width:44px;min-height:44px;color:var(--sub)}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:90%;padding:9px 13px;border-radius:14px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:#f2f2ef;border-bottom-left-radius:4px}
+.msg.err{align-self:flex-start;background:#fdecec;color:#991b1b}
+.msg-step{align-self:flex-start;font-size:12px;color:var(--sub);padding:0 4px}
+.starters{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px}
+.starters[hidden]{display:none}
+.starters button{border:1px solid var(--line);background:#fafaf8;border-radius:99px;padding:8px 12px;font-size:12.5px;font-weight:500;min-height:36px}
+.chat-form{display:flex;gap:8px;align-items:flex-end;padding:10px 16px 16px;border-top:1px solid var(--line)}
+.chat-form textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:inherit;font-size:13.5px;line-height:1.4;max-height:120px;background:#fafaf8;min-height:44px}
+.chat-form textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.chat-send{border:0;background:var(--accent);color:#fff;border-radius:12px;padding:0 16px;font-weight:700;min-height:44px}
+.chat-send:disabled{opacity:.5;cursor:default}
+@media (max-width:880px){
+  .app.chat-open{grid-template-columns:1fr}
+  .chat{position:fixed;left:0;right:0;bottom:0;height:62vh;height:62dvh;z-index:20;border-left:0;border-radius:18px 18px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.14)}
+}
 @media (max-width:880px){
   html,body{height:100%;overflow:hidden}
   .app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:100vh;height:100dvh}
@@ -148,9 +173,23 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
       <div class="spacer"></div>
       <label class="tg"><span>자동 회전</span><input type="checkbox" id="auto"><i></i></label>
       <button class="btn" id="reset">↺ 시점 초기화</button>
+      <button class="btn" id="chatToggle" aria-expanded="false" aria-controls="chat">AI 채팅</button>
     </div>
     <div class="checks" id="checks"></div>
   </main>
+
+  <aside class="chat" id="chat" aria-label="AI 채팅">
+    <div class="chat-head">
+      <div><h2>셋업 도우미</h2><p>지금 화면의 셋업을 보고 답해요. AI가 만든 답변이에요.</p></div>
+      <button class="chat-close" id="chatClose" aria-label="채팅 닫기">×</button>
+    </div>
+    <div class="msgs" id="msgs" aria-live="polite"></div>
+    <div class="starters" id="starters"></div>
+    <form class="chat-form" id="chatForm">
+      <textarea id="chatInput" rows="1" maxlength="1000" placeholder="셋업에 대해 물어보세요" aria-label="질문 입력"></textarea>
+      <button class="chat-send" id="chatSend" type="submit">보내기</button>
+    </form>
+  </aside>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -904,6 +943,7 @@ function updateCards(){
   $('#cMonS').textContent=`${spec.short}${info.curved?' CURVED':''}${S.mount==='armLap'?` + LAPTOP ${S.lapSize}"`:''}${S.subCount?` + ${MONITORS[S.sub].short}×${S.subCount}`:''} / mm`;
 }
 function eyeY(){const H=S.userH*10;return S.deskH>=900?.936*H:S.deskH+.295*H}
+let lastChecks=[];
 function renderChecks(){
   const {deskW:W,deskD:D,deskH:H}=S,{main,mainZ,mainCY,monBox,itemBox,kb,kbZ}=info,out=[];
   const standing=S.deskH>=900;
@@ -945,6 +985,7 @@ function renderChecks(){
     else if(under.length)out.push({t:'책상 밑 다리 공간',v:`폭 ${legs} mm`,s:legs<550?'bad':legs<650?'warn':'ok',n:`서랍장이 책상 밑에 들어가요 (여유 높이 ${clear-Math.max(...under.map(o=>o.e.h))}mm)`});
     else out.push({t:'서랍장',v:`${S.drawers.length}개 · 책상 옆`,s:'info',n:'옆 서랍장은 위에 물건을 올려두기 좋아요'});
   }
+  lastChecks=out.map(c=>({title:c.t,value:c.v,status:c.s,note:c.n}));
   $('#checks').innerHTML=out.map(c=>`<div class="ck ${c.s}"><div class="t">${c.t}</div><div class="v">${c.v}</div><div class="n">${c.n}</div></div>`).join('');
 }
 
@@ -976,7 +1017,7 @@ function summary(c){return `${c.deskW}×${c.deskD} · ${MONITORS[c.mon]?.short||
 function renderSlots(){
   const sl=getSlots();
   $('#slots').innerHTML=['A','B','C'].map(k=>`<div class="slot"><button class="load ${sl[k]?'':'empty'}" data-k="${k}"><b>${k}</b>${sl[k]?summary(sl[k]):'비어 있음'}</button><button class="save" data-k="${k}">저장</button></div>`).join('');
-  $('#slots').querySelectorAll('.load').forEach(b=>b.addEventListener('click',()=>{const c=getSlots()[b.dataset.k];if(!c)return;S={...DEFAULTS,...c,extraDesks:(c.extraDesks||[]).map(o=>({...o})),drawers:(c.drawers||[]).map(o=>({...o})),sets:(c.sets||[]).map(o=>({...o})),pegs:(c.pegs||[]).map(o=>({...o}))};refreshUI();renderExtra();renderDrawers();renderSets();renderPegs();build()}));
+  $('#slots').querySelectorAll('.load').forEach(b=>b.addEventListener('click',()=>{const c=getSlots()[b.dataset.k];if(!c)return;loadState(c)}));
   $('#slots').querySelectorAll('.save').forEach(b=>b.addEventListener('click',()=>{const o={...getSlots()};o[b.dataset.k]=JSON.parse(JSON.stringify(S));putSlots(o);renderSlots()}));
 }
 
@@ -986,8 +1027,103 @@ new ResizeObserver(resize).observe(view);
 function loop(now){requestAnimationFrame(loop);if(camAnim)camAnim(now);controls.update();
   for(const w of roomWalls)w.g.visible=camera.position.clone().sub(w.p).dot(w.n)>-1;renderer.render(scene,camera)}
 
+/* ---------- agent API (window.deskSim) ----------
+   채팅 에이전트가 상태를 읽고 바꾸는 유일한 통로. 값은 패널(UI)에 정의된 범위·선택지로 검증한다.
+   배열 항목(추가 책상·서랍장·세트·타공판)은 아직 읽기만 되고 applyPatch로는 못 바꾼다. */
+const FIELDS={};for(const sec of UI)for(const it of sec.items)FIELDS[it.k]={...it,section:sec.sec};
+const clone=o=>JSON.parse(JSON.stringify(o));
+function loadState(c){
+  S={...DEFAULTS,...c,extraDesks:(c.extraDesks||[]).map(o=>({...o})),drawers:(c.drawers||[]).map(o=>({...o})),sets:(c.sets||[]).map(o=>({...o})),pegs:(c.pegs||[]).map(o=>({...o}))};
+  refreshUI();renderExtra();renderDrawers();renderSets();renderPegs();build();reframe();
+}
+function schema(){
+  return Object.values(FIELDS).map(f=>({key:f.k,label:f.t,section:f.section,type:f.type,min:f.min,max:f.max,step:f.step,unit:f.unit,
+    options:f.opts?f.opts.map(norm).map(o=>({value:o.v,label:o.l})):undefined}));
+}
+function applyPatch(patch){
+  const applied={},rejected={};
+  const keys=Object.keys(patch||{}).sort((a,b)=>(['mon','mount'].includes(b)?1:0)-(['mon','mount'].includes(a)?1:0)); // mon·mount는 다른 값을 바꾸므로 먼저 적용
+  for(const k of keys){
+    const f=FIELDS[k],raw=patch[k];let v=raw;
+    if(!f){rejected[k]='알 수 없는 항목이에요';continue}
+    if(f.type==='range'){
+      v=Number(raw);if(raw===''||raw===null||!Number.isFinite(v)){rejected[k]='숫자가 아니에요';continue}
+      v=Math.min(f.max,Math.max(f.min,Math.round((v-f.min)/f.step)*f.step+f.min));
+    }else if(f.type==='toggle'){
+      if(typeof raw!=='boolean'){rejected[k]='true/false여야 해요';continue}
+    }else{
+      const o=f.opts.map(norm).find(o=>String(o.v)===String(raw));
+      if(!o){rejected[k]='선택지: '+f.opts.map(norm).map(o=>o.v).join(', ');continue}
+      v=o.v;
+    }
+    set(k,v);applied[k]=S[k];
+  }
+  return {applied,rejected};
+}
+window.deskSim={
+  getState:()=>clone(S),
+  getChecks:()=>clone(lastChecks),
+  schema,applyPatch,loadState,
+  reset:()=>loadState({}),
+};
+
 renderPanel();renderExtra();renderDrawers();renderSets();renderPegs();refreshUI();renderSlots();build();setView('iso',true);resize();setAuto(true);requestAnimationFrame(loop);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>build());
+})();
+</script>
+<script>
+/* ---------- AI 채팅 패널: window.deskSim(시뮬레이터 API)과 /api/chat/stream만 쓴다 ---------- */
+(function(){
+const $=s=>document.querySelector(s);
+const app=document.querySelector('.app'),msgs=$('#msgs'),input=$('#chatInput'),sendBtn=$('#chatSend'),toggle=$('#chatToggle');
+const STARTERS=['지금 내 셋업 괜찮아?','눈이랑 화면 거리는 적당해?','가장 먼저 고칠 게 뭐야?'];
+const history=[];let busy=false;
+
+function setOpen(open){app.classList.toggle('chat-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.textContent=open?'AI 채팅 닫기':'AI 채팅';
+  setTimeout(()=>window.dispatchEvent(new Event('resize')),30);if(open)setTimeout(()=>input.focus(),50)}
+toggle.addEventListener('click',()=>setOpen(!app.classList.contains('chat-open')));
+$('#chatClose').addEventListener('click',()=>setOpen(false));
+
+function add(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d}
+function setBusy(b){busy=b;sendBtn.disabled=b;input.disabled=b;if(!b)input.focus()}
+
+async function send(question){
+  question=question.trim();if(!question||busy)return;
+  if(!window.deskSim){add('msg err','시뮬레이터가 아직 준비되지 않았어요.');return}
+  $('#starters').hidden=true;
+  add('msg user',question);input.value='';input.style.height='auto';setBusy(true);
+  const status=add('msg-step','…');let bubble=null,answer='',failed=false;
+  try{
+    const res=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question,history:history.slice(-10),state:deskSim.getState(),checks:deskSim.getChecks()})});
+    if(!res.ok||!res.body)throw new Error('HTTP '+res.status);
+    const reader=res.body.getReader(),dec=new TextDecoder();let buf='';
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let i;while((i=buf.indexOf('\n\n'))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+2);
+        if(!line.startsWith('data:'))continue;
+        const ev=JSON.parse(line.slice(5));
+        if(ev.type==='step'&&ev.phase==='start')status.textContent=ev.label+'…';
+        else if(ev.type==='step')status.textContent=ev.label+' · '+(ev.detail||'완료');
+        else if(ev.type==='token'){if(!bubble){bubble=add('msg ai','')}answer+=ev.text;bubble.textContent=answer;msgs.scrollTop=msgs.scrollHeight}
+        else if(ev.type==='done'){answer=ev.message}
+        else if(ev.type==='error'){failed=true;add('msg err',ev.message)}
+      }
+    }
+  }catch(e){failed=true;add('msg err','서버와 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.')}
+  if(!failed&&answer){history.push({role:'user',content:question},{role:'assistant',content:answer})}
+  setBusy(false);
+}
+
+$('#chatForm').addEventListener('submit',e=>{e.preventDefault();send(input.value)});
+input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send(input.value)}});
+input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(120,input.scrollHeight)+'px'});
+$('#starters').innerHTML=STARTERS.map(t=>`<button type="button">${t}</button>`).join('');
+$('#starters').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>send(b.textContent)));
+add('msg ai','안녕하세요! 지금 꾸며 둔 책상 셋업을 보고 평가하고 조언해 드려요. 아직은 설명만 하고, 직접 바꾸는 기능은 준비 중이에요.');
+setOpen(matchMedia('(min-width:881px)').matches);
 })();
 </script>
 </body>
