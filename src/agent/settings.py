@@ -46,7 +46,9 @@ def format_settings(schema: list[dict], section: str | None = None, collections:
         return "\n".join(lines)
     if section in by_label:
         name, c = by_label[section]
-        lines = [f"[{section}] collection={name}, 최대 {c['max']}개. 번호(index)는 0부터이고 화면에는 {c['first']}번부터 보여요.",
+        item = c.get("item_label") or c["label"]
+        lines = [f"[{section}] collection={name}, 최대 {c['max']}개. 화면에는 '{item} {c['first']}', '{item} {c['first'] + 1}'처럼 번호가 붙어 있고, "
+                 "update·remove의 number에는 그 번호를 그대로 쓰세요.",
                  "add/update의 values에 쓸 수 있는 키:"]
         lines += [f"- {f['key']} ({f['label']}): {_rule(f)}" for f in c["fields"]]
         return "\n".join(lines)
@@ -146,7 +148,7 @@ def validate_ops(ops: list, collections: dict, state: dict) -> tuple[list[dict],
         if spec is None:
             problems.append(f"작업 {n}: 알 수 없는 종류 '{name}' (가능: {', '.join(collections)})")
             continue
-        label, first = spec["label"], spec.get("first", 1)
+        label, first = spec.get("item_label") or spec["label"], spec.get("first", 1)  # label은 화면에 보이는 이름(번호 앞)
         raw = op.get("values")
         values, rejected, vnotes = validate_patch(raw if isinstance(raw, dict) else {}, spec["fields"]) if kind in ("add", "update") else ({}, {}, {})
         for k, why in rejected.items():
@@ -163,17 +165,19 @@ def validate_ops(ops: list, collections: dict, state: dict) -> tuple[list[dict],
             clean.append({"op": "add", "collection": name, "values": values})
             lens[name] += 1
             continue
-        index = op.get("index")
+        number = op.get("number")  # 화면에 보이는 번호(서랍장 2 → 2). 내부 위치(index)는 여기서 계산한다
         if kind not in ("update", "remove"):
             problems.append(f"작업 {n}: 알 수 없는 작업 '{kind}' (add, update, remove 중 하나)")
             continue
-        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < lens[name]:
-            problems.append(f"{label} 번호 {index!r}가 맞지 않아요 (현재 {lens[name]}개, 0~{max(lens[name] - 1, 0)})")
+        index = number - first if isinstance(number, int) and not isinstance(number, bool) else -1
+        if not 0 <= index < lens[name]:
+            have = f"{first}~{first + lens[name] - 1}번" if lens[name] else "없음"
+            problems.append(f"{label} 번호 {number!r}가 맞지 않아요 (현재 {lens[name]}개: {have})")
             continue
-        title = f"{label} {index + first}"
+        title = f"{label} {number}"
         if kind == "remove":
-            items.append({"key": f"{name}-{index}", "label": f"{title} 삭제", "from": "", "to": "삭제"})
-            clean.append({"op": "remove", "collection": name, "index": index})
+            items.append({"key": f"{name}-{number}", "label": f"{title} 삭제", "from": "", "to": "삭제"})
+            clean.append({"op": "remove", "collection": name, "index": index})  # 브라우저는 내부 위치(0부터)를 받는다
             lens[name] -= 1
             continue
         current = (state.get(name) or [])[index] if index < len(state.get(name) or []) else {}
@@ -182,7 +186,7 @@ def validate_ops(ops: list, collections: dict, state: dict) -> tuple[list[dict],
             problems.append(f"{title}: 이미 그 값이거나 바꿀 값이 없어요")
             continue
         for k, v in changed.items():
-            items.append({"key": f"{name}.{index}.{k}", "label": f"{title}: {fields[k]['label']}",
+            items.append({"key": f"{name}.{number}.{k}", "label": f"{title}: {fields[k]['label']}",
                           "from": _show(fields[k], current.get(k)), "to": _show(fields[k], v)})
         clean.append({"op": "update", "collection": name, "index": index, "values": changed})
     return clean, items, problems, notes

@@ -285,7 +285,7 @@ const WHERE=[{v:'underL',l:'책상 밑 왼쪽'},{v:'underR',l:'책상 밑 오른
 const DPRESET={mobile:{l:'이동식 3단',w:400,d:500,h:600,tiers:3,casters:true},desk:{l:'책상 높이',w:400,d:600,h:0,tiers:3,casters:false},wide:{l:'와이드 4단',w:800,d:450,h:900,tiers:4,casters:false}};
 const DF=[{k:'w',t:'가로 (폭)',min:250,max:1200,step:10},{k:'d',t:'깊이',min:250,max:800,step:10},{k:'h',t:'높이',min:250,max:1400,step:10},{k:'x',t:'좌우 이동',min:-1500,max:1500,step:10},{k:'z',t:'앞뒤 이동',min:-1000,max:1000,step:10}];
 const PLACES=[{v:'right',l:'오른쪽 옆'},{v:'left',l:'왼쪽 옆'},{v:'rightL',l:'오른쪽 ㄱ자'},{v:'leftL',l:'왼쪽 ㄱ자'},{v:'frontR',l:'앞쪽 오른쪽 ㄱ자'},{v:'frontL',l:'앞쪽 왼쪽 ㄱ자'},{v:'back',l:'뒤쪽'}];
-const XF=[{k:'w',t:'가로 (폭)',min:400,max:2400,step:10},{k:'d',t:'세로 (깊이)',min:300,max:1000,step:10},{k:'h',t:'높이',min:600,max:1250,step:5},{k:'gap',t:'메인 책상과 간격',min:0,max:1500,step:10},{k:'shift',t:'앞뒤 이동',min:-1500,max:1500,step:10}];
+const XF=[{k:'w',t:'가로 (폭)',min:400,max:2400,step:10},{k:'d',t:'세로 (깊이)',min:300,max:1000,step:10},{k:'h',t:'높이',min:600,max:1250,step:5},{k:'gap',t:'책상 1과 간격',min:0,max:1500,step:10},{k:'shift',t:'앞뒤 이동',min:-1500,max:1500,step:10}];
 let S={...DEFAULTS,extraDesks:[],drawers:[],sets:[],pegs:[]};
 
 const UI=[
@@ -311,7 +311,7 @@ const UI=[
   {k:'door',t:'문',type:'toggle',when:()=>S.room},
   {k:'doorWall',t:'문 위치',type:'seg',opts:[{v:'left',l:'왼쪽 벽'},{v:'right',l:'오른쪽 벽'},{v:'front',l:'앞쪽 벽'}],when:()=>S.room&&S.door},
  ]},
- {sec:'메인 모니터',items:[
+ {sec:'모니터 1',items:[
   {k:'mon',t:'모델',type:'select',opts:Object.entries(MONITORS).map(([v,m])=>({v,l:m.label}))},
   {k:'curved',t:'커브드 화면',type:'toggle',when:()=>!!MONITORS[S.mon].R},
   {k:'mount',t:'거치 방식',type:'seg',opts:[{v:'stand',l:'기본 스탠드'},{v:'arm',l:'모니터암'},{v:'armLap',l:'모니터+노트북 암'}]},
@@ -323,7 +323,7 @@ const UI=[
   {k:'monX',t:'모니터 좌우 위치 (책상 가운데 기준)',type:'range',min:-1200,max:1200,step:10,unit:'mm',chips:[-300,0,300]},
   {k:'armX',t:'암 기둥(클램프) 좌우 위치',type:'range',min:-1200,max:1200,step:10,unit:'mm',chips:[-400,0,400],when:()=>S.mount!=='stand'},
  ]},
- {sec:'보조 모니터',items:[
+ {sec:'모니터 2',items:[
   {k:'subCount',t:'개수',type:'seg',opts:[{v:0,l:'없음'},{v:1,l:'1대'},{v:2,l:'2대 (양옆)'}]},
   {k:'subSide',t:'위치',type:'seg',opts:[{v:'left',l:'왼쪽'},{v:'right',l:'오른쪽'}],when:()=>S.subCount==1},
   {k:'sub',t:'크기',type:'seg',opts:[{v:'24',l:'24"'},{v:'27',l:'27"'},{v:'32',l:'32"'}],when:()=>S.subCount>0},
@@ -352,7 +352,7 @@ const MOUNT_NAME={stand:'기본 스탠드',arm:'모니터암',armLap:'모니터+
 const TOWER_NAME={deskL:'책상 왼쪽',deskR:'책상 오른쪽',floor:'바닥'};
 // 배열로 여러 개 놓는 물건. addBtn은 기존 추가 로직(기본값 계산 포함)을 그대로 쓰기 위한 버튼
 const ARR=[
-  {key:'extraDesks',box:'extra',label:'추가 책상',first:2,max:3,addBtn:'#addDesk',sum:e=>`${e.w}×${e.d} · ${(PLACES.find(p=>p.v===e.place)||{}).l||''}`},
+  {key:'extraDesks',box:'extra',label:'추가 책상',item:'책상',first:2,max:3,addBtn:'#addDesk',sum:e=>`${e.w}×${e.d} · ${(PLACES.find(p=>p.v===e.place)||{}).l||''}`},
   {key:'drawers',box:'drawers',label:'서랍장',first:1,max:4,addBtn:'#addDrawer',sum:e=>`${e.w}×${e.d}×${e.h} · ${e.tiers}단`},
   {key:'sets',box:'sets',label:'모니터+노트북 세트',first:1,max:4,addBtn:'#addSet',sum:e=>`${MONITORS[e.mon].short}${e.lap?' + 노트북':''}`},
   {key:'pegs',box:'pegs',label:'타공판',first:1,max:4,addBtn:'#addPeg',sum:e=>`${e.w}×${e.h}`},
@@ -360,9 +360,9 @@ const ARR=[
 // 하나만 있는 물건. keys는 UI 배열의 설정 항목 키. fixed는 항상 있고 지울 수 없는 것
 const ITEM_DEFS=[
   {id:'basic',label:'내 키 · 표시',fixed:true,keys:['userH','dims'],sum:()=>`키 ${S.userH}cm`},
-  {id:'desk',label:'책상',fixed:true,keys:['deskW','deskD','deskH','deskColor','frameColor'],sum:()=>`${S.deskW}×${S.deskD} · H ${S.deskH}`},
-  {id:'mon',label:'메인 모니터',fixed:true,keys:['mon','curved','mount','lapSide','lapSize','lapAngle','monBack','monLift','monX','armX'],sum:()=>`${MONITORS[S.mon].short} · ${MOUNT_NAME[S.mount]}`},
-  {id:'sub',label:'보조 모니터',keys:['subCount','subSide','sub','subPortrait','subAngle'],on:()=>S.subCount>0,add:()=>set('subCount',1),remove:()=>set('subCount',0),sum:()=>`${MONITORS[S.sub].short} × ${S.subCount}`},
+  {id:'desk',label:'책상 1',fixed:true,keys:['deskW','deskD','deskH','deskColor','frameColor'],sum:()=>`${S.deskW}×${S.deskD} · H ${S.deskH}`},
+  {id:'mon',label:'모니터 1',fixed:true,keys:['mon','curved','mount','lapSide','lapSize','lapAngle','monBack','monLift','monX','armX'],sum:()=>`${MONITORS[S.mon].short} · ${MOUNT_NAME[S.mount]}`},
+  {id:'sub',label:()=>S.subCount>1?'모니터 2·3':'모니터 2',menu:'모니터',keys:['subCount','subSide','sub','subPortrait','subAngle'],on:()=>S.subCount>0,add:()=>set('subCount',1),remove:()=>set('subCount',0),sum:()=>`${MONITORS[S.sub].short} × ${S.subCount}`},
   {id:'kbm',label:'키보드 · 마우스',keys:['kb','theme','mouse'],on:()=>S.kb!=='none'||S.mouse,add:()=>{set('kb','tkl');set('mouse',true)},remove:()=>{set('kb','none');set('mouse',false)},sum:()=>`${KB_NAME[S.kb]}${S.mouse?' + 마우스':''}`},
   {id:'mat',label:'데스크매트',keys:['mat','matColor'],on:()=>S.mat!=='none',add:()=>set('mat','900x400'),remove:()=>set('mat','none'),sum:()=>S.mat.replace('x',' × ')+' mm'},
   {id:'laptop',label:'노트북',keys:['laptop'],on:()=>S.laptop!=='none',add:()=>set('laptop','14'),remove:()=>set('laptop','none'),sum:()=>`${S.laptop}"`},
@@ -371,6 +371,7 @@ const ITEM_DEFS=[
   {id:'chair',label:'의자',keys:[],note:'책상 앞에 놓여요. 크기는 「내 키 · 표시」의 키에 맞춰 그려져요.',on:()=>S.chair,add:()=>set('chair',true),remove:()=>set('chair',false),sum:()=>`키 ${S.userH}cm 기준`},
   {id:'room',label:'방',keys:['roomW','roomD','roomH','roomX','roomGap','wallColor','floorColor','win','winW','winX','door','doorWall'],on:()=>S.room,add:()=>set('room',true),remove:()=>set('room',false),sum:()=>`${S.roomW}×${S.roomD}`},
 ];
+ARR.forEach(a=>{a.item=a.item||a.label}); // item = 화면에 보이는 이름(번호 앞). 번호는 i+first로 화면·채팅·카드가 모두 같다
 let sel='desk'; // 선택한 아이템: 단일 물건은 id, 배열 물건은 'drawers:0'처럼 키:번호
 
 const rows=[];
@@ -431,13 +432,13 @@ function placeDetail(){
 }
 function listItems(){
   const out=[];
-  for(const d of ITEM_DEFS)if(d.fixed||d.on())out.push({id:d.id,label:d.label,sum:d.sum(),fixed:!!d.fixed});
-  for(const a of ARR)S[a.key].forEach((e,i)=>out.push({id:a.key+':'+i,label:`${a.label} ${i+a.first}`,sum:a.sum(e),fixed:false}));
+  for(const d of ITEM_DEFS)if(d.fixed||d.on())out.push({id:d.id,label:typeof d.label==='function'?d.label():d.label,sum:d.sum(),fixed:!!d.fixed});
+  for(const a of ARR)S[a.key].forEach((e,i)=>out.push({id:a.key+':'+i,label:`${a.item} ${i+a.first}`,sum:a.sum(e),fixed:false}));
   return out;
 }
 function addables(){
   const out=[];
-  for(const d of ITEM_DEFS)if(!d.fixed)out.push({label:d.label,off:d.on()?'이미 추가됨':'',run:()=>{d.add();sel=d.id}});
+  for(const d of ITEM_DEFS)if(!d.fixed)out.push({label:d.menu||d.label,off:d.on()?'이미 추가됨':'',run:()=>{d.add();sel=d.id}});
   for(const a of ARR)out.push({label:a.label,off:S[a.key].length>=a.max?`최대 ${a.max}개`:'',run:()=>{const b=$(a.addBtn);if(b)b.click();sel=a.key+':'+(S[a.key].length-1)}});
   return out;
 }
@@ -609,7 +610,7 @@ function buildRoom(g){
 function renderSets(){
   const box=$('#sets'),L=S.sets;
   L.forEach(e=>{if(e.desk>S.extraDesks.length)e.desk=0;if(e.yaw==null)e.yaw=0;if(e.lapAng==null)e.lapAng=17});
-  const deskOpts=[{v:0,l:'메인 책상'},...S.extraDesks.map((_,i)=>({v:i+1,l:`책상 ${i+2}`}))];
+  const deskOpts=[{v:0,l:'책상 1'},...S.extraDesks.map((_,i)=>({v:i+1,l:`책상 ${i+2}`}))];
   box.innerHTML=L.map((e,i)=>`<div class="xd"><div class="xh"><b>세트 ${i+1}</b><button class="del" data-i="${i}">삭제</button></div>
     <div class="lab"><span>놓을 책상</span></div><div class="seg" style="margin-bottom:12px">${deskOpts.map(o=>`<button data-i="${i}" data-desk="${o.v}" class="${e.desk===o.v?'on':''}">${o.l}</button>`).join('')}</div>
     <div class="row"><div class="lab"><span>모니터</span></div><select data-i="${i}">${Object.entries(MONITORS).map(([v,m])=>`<option value="${v}" ${e.mon===v?'selected':''}>${m.label}</option>`).join('')}</select></div>
@@ -636,7 +637,7 @@ function renderSets(){
 function renderPegs(){
   const box=$('#pegs'),L=S.pegs;
   L.forEach(e=>{if(e.desk>S.extraDesks.length)e.desk=0});
-  const deskOpts=[{v:0,l:'메인 책상'},...S.extraDesks.map((_,i)=>({v:i+1,l:`책상 ${i+2}`}))];
+  const deskOpts=[{v:0,l:'책상 1'},...S.extraDesks.map((_,i)=>({v:i+1,l:`책상 ${i+2}`}))];
   box.innerHTML=L.map((e,i)=>`<div class="xd"><div class="xh"><b>타공판 ${i+1}</b><button class="del" data-i="${i}">삭제</button></div>
     <div class="lab"><span>놓을 책상 (뒤쪽 끝)</span></div><div class="seg" style="margin-bottom:12px">${deskOpts.map(o=>`<button data-i="${i}" data-desk="${o.v}" class="${e.desk===o.v?'on':''}">${o.l}</button>`).join('')}</div>
     <div class="row"><div class="lab"><span>색</span></div><div class="sw sm">${PEG_COLORS.map(o=>`<button data-i="${i}" data-color="${o.v}" title="${o.l}" style="--c:${o.v}" class="${e.color===o.v?'on':''}"></button>`).join('')}</div></div>
@@ -790,11 +791,11 @@ const controls=new THREE.OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true;controls.dampingFactor=.08;controls.maxPolarAngle=Math.PI*.497;
 controls.minDistance=250;controls.maxDistance=14000;controls.autoRotateSpeed=.7;
 controls.addEventListener('start',()=>{$('#hint').style.opacity=0});
-scene.add(new THREE.HemisphereLight(0xffffff,0xd8cfc3,.82));
-const sun=new THREE.DirectionalLight(0xffffff,.72);sun.position.set(-1900,3300,1500);sun.castShadow=true;
+scene.add(new THREE.HemisphereLight(0xffffff,0xd8cfc3,.52));
+const sun=new THREE.DirectionalLight(0xffffff,.5);sun.position.set(-1900,3300,1500);sun.castShadow=true;
 sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-4200,right:4200,top:4200,bottom:-4200,near:100,far:10000});sun.shadow.camera.updateProjectionMatrix();sun.shadow.bias=-.0004;
 scene.add(sun);
-const fill=new THREE.DirectionalLight(0xfff3e4,.28);fill.position.set(2200,1400,2600);scene.add(fill);
+const fill=new THREE.DirectionalLight(0xfff3e4,.18);fill.position.set(2200,1400,2600);scene.add(fill);
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(40000,40000),new THREE.ShadowMaterial({opacity:.16}));
 floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
 
@@ -892,10 +893,10 @@ function kbKeys(type){
 function buildKeyboard(type,theme){
   const U=19.05,K=kbKeys(type),uw=Math.max(...K.map(k=>k.x+k.w)),uh=Math.max(...K.map(k=>k.y+k.h)),m=11,w=uw*U+2*m,d=uh*U+2*m;
   const g=new THREE.Group();
-  g.add(slab(w,d,18,8,M(theme==='white'?'#e8e6e1':'#1b1c1f',{r:.5})));
+  g.add(slab(w,d,18,8,M(theme==='white'?'#bfbbb2':'#1b1c1f',{r:.5})));
   const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.55});
   const inst=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat,K.length);inst.userData.disposeMat=true;
-  const cols=theme==='white'?['#f8f6f1','#dcd8d0','#1f5eff']:['#2b2c30','#46484e','#e0533b'];
+  const cols=theme==='white'?['#f1efea','#c9c5bc','#1f5eff']:['#2b2c30','#46484e','#e0533b'];
   const dm=new THREE.Object3D(),col=new THREE.Color();
   K.forEach((k,i)=>{dm.position.set(-w/2+m+(k.x+k.w/2)*U,23,-d/2+m+(k.y+k.h/2)*U);dm.scale.set(k.w*U-3.2,10,k.h*U-3.2);dm.updateMatrix();inst.setMatrixAt(i,dm.matrix);inst.setColorAt(i,col.set(cols[k.c]))});
   if(inst.instanceColor)inst.instanceColor.needsUpdate=true;
@@ -904,7 +905,7 @@ function buildKeyboard(type,theme){
 }
 function buildMouse(theme){
   const geo=new THREE.SphereGeometry(1,32,16,0,Math.PI*2,0,Math.PI/2);
-  const m=new THREE.Mesh(geo,M(theme==='white'?'#f4f3ef':'#232427',{r:.4}));m.scale.set(33,38,61);
+  const m=new THREE.Mesh(geo,M(theme==='white'?'#e7e4dd':'#232427',{r:.4}));m.scale.set(33,38,61);
   const g=new THREE.Group();g.add(m);return g;
 }
 function buildLaptop(size){
@@ -1225,22 +1226,22 @@ function applyPatch(patch){
 
 /* 배열 아이템: 어떤 값을 가질 수 있는지(패널의 편집기와 같은 항목) */
 const rangeField=f=>({...f,type:'range',unit:f.unit||'mm'});
-const deskOpts=()=>[0,...S.extraDesks.map((_,i)=>i+1)].map(v=>({v,l:v?`책상 ${v+1}`:'메인 책상'}));
+const deskOpts=()=>[0,...S.extraDesks.map((_,i)=>i+1)].map(v=>({v,l:v?`책상 ${v+1}`:'책상 1'}));
 const COLS={
   extraDesks:{label:'추가 책상',fields:[{k:'place',t:'위치',type:'select',opts:PLACES},...XF.map(rangeField)]},
   drawers:{label:'서랍장',fields:[{k:'where',t:'위치',type:'select',opts:WHERE},...DF.map(rangeField),
     {k:'tiers',t:'서랍 칸 수',type:'range',min:1,max:6,step:1,unit:'단'},{k:'casters',t:'바퀴',type:'toggle'},{k:'color',t:'색',type:'select',opts:DESK_COLORS}]},
-  sets:{label:'모니터+노트북 세트',fields:[{k:'desk',t:'놓을 책상 (0=메인, 1부터=추가 책상 순서)',type:'select',opts:deskOpts},
+  sets:{label:'모니터+노트북 세트',fields:[{k:'desk',t:'놓을 책상 (선택지 이름 그대로 써도 돼요)',type:'select',opts:deskOpts},
     {k:'mon',t:'모니터',type:'select',opts:Object.entries(MONITORS).map(([v,m])=>({v,l:m.label}))},
     {k:'lap',t:'노트북도 같이 걸기',type:'toggle'},{k:'side',t:'노트북 위치',type:'select',opts:[{v:'left',l:'왼쪽'},{v:'right',l:'오른쪽'}]},
     {k:'size',t:'노트북 크기',type:'select',opts:['13','14','16'].map(v=>({v,l:v+'"'}))},{k:'kb',t:'키보드·마우스',type:'toggle'},...SF.map(rangeField)]},
-  pegs:{label:'타공판',fields:[{k:'desk',t:'놓을 책상 (0=메인, 1부터=추가 책상 순서)',type:'select',opts:deskOpts},{k:'color',t:'색',type:'select',opts:PEG_COLORS},
+  pegs:{label:'타공판',fields:[{k:'desk',t:'놓을 책상 (선택지 이름 그대로 써도 돼요)',type:'select',opts:deskOpts},{k:'color',t:'색',type:'select',opts:PEG_COLORS},
     {k:'mount',t:'설치 방식',type:'select',opts:[{v:'clamp',l:'책상 클램프'},{v:'easel',l:'책상 위 (뒷다리)'},{v:'floor',l:'바닥 스탠드'},{v:'wall',l:'벽 부착'}]},
     {k:'acc',t:'선반·후크 등 액세서리',type:'toggle'},...PF.map(rangeField)]},
 };
 function collections(){
   const out={};
-  for(const a of ARR)out[a.key]={label:COLS[a.key].label,max:a.max,first:a.first,fields:COLS[a.key].fields.map(specOf)};
+  for(const a of ARR)out[a.key]={label:COLS[a.key].label,item_label:a.item,max:a.max,first:a.first,fields:COLS[a.key].fields.map(specOf)};
   return out;
 }
 const REND={extraDesks:()=>renderExtra(),drawers:()=>renderDrawers(),sets:()=>renderSets(),pegs:()=>renderPegs()};
@@ -1272,7 +1273,7 @@ const okOp=text=>({ok:true,text}),failOp=text=>({ok:false,text});
 function runOp(op){
   const a=ARR.find(a=>a.key===op.collection);
   if(!a)return failOp('알 수 없는 종류: '+op.collection);
-  const L=S[a.key],n=i=>`${a.label} ${i+a.first}`;
+  const L=S[a.key],n=i=>`${a.item} ${i+a.first}`;
   const bad=b=>b.length?` (일부 값은 거절: ${b.join('; ')})`:'';
   if(op.op==='add'){
     if(L.length>=a.max)return failOp(`${a.label}은(는) 최대 ${a.max}개예요`);
@@ -1281,7 +1282,7 @@ function runOp(op){
     const i=L.length-1;return okOp(`${n(i)} 추가`+bad(setFields(a.key,i,op.values)));
   }
   const i=Number(op.index);
-  if(!Number.isInteger(i)||i<0||i>=L.length)return failOp(`${a.label} 번호가 맞지 않아요(0~${L.length-1})`);
+  if(!Number.isInteger(i)||i<0||i>=L.length)return failOp(`${a.item} 번호가 맞지 않아요(${a.first}~${a.first+L.length-1}번)`);
   if(op.op==='update')return okOp(`${n(i)} 수정`+bad(setFields(a.key,i,op.values)));
   if(op.op==='remove'){
     const name=n(i),x=document.getElementById(a.box).querySelectorAll(':scope > .xd')[i];
@@ -1321,7 +1322,7 @@ window.deskSim={
   autoRotate:on=>setAuto(!!on),
 };
 
-renderPanel();renderExtra();renderDrawers();renderSets();renderPegs();refreshUI();renderSlots();build();setView('iso',true);resize();setAuto(true);requestAnimationFrame(loop);
+renderPanel();renderExtra();renderDrawers();renderSets();renderPegs();refreshUI();renderSlots();build();setView('iso',true);resize();setAuto(false);requestAnimationFrame(loop);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>build());
 })();
 </script>
@@ -1372,7 +1373,7 @@ function showApproval(ev){
       :'<div class="done"><span>취소했어요</span></div>';
     const undo=card.querySelector('.undo');
     if(undo)undo.addEventListener('click',()=>{deskSim.loadState(before);undo.parentNode.innerHTML='<span>되돌렸어요</span>'});
-    const next=await run('/api/chat/approve',{thread_id:ev.thread_id,approve,result,checks:deskSim.getChecks()});
+    const next=await run('/api/chat/approve',{thread_id:ev.thread_id,approve,result,checks:deskSim.getChecks(),state:deskSim.getState()});
     next?showApproval(next):finishTurn();
   };
   card.querySelector('.ok').addEventListener('click',()=>decide(true));
@@ -1417,7 +1418,7 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(120,input.scrollHeight)+'px'});
 $('#starters').innerHTML=STARTERS.map(t=>`<button type="button">${t}</button>`).join('');
 $('#starters').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>send(b.textContent)));
-add('msg ai','안녕하세요! 지금 꾸며 둔 셋업을 보고 조언하고, 화면의 기능을 대신 써 드려요. 설정 바꾸기, 서랍장·타공판·보조 모니터 추가, 슬롯 저장·불러오기, 시점 바꾸기까지 말로 시키세요. 바뀌는 내용은 먼저 보여 드리고, 승인하면 적용해요.');
+add('msg ai','안녕하세요! 지금 꾸며 둔 셋업을 보고 조언하고, 화면의 기능을 대신 써 드려요. 설정 바꾸기, 서랍장·타공판·모니터 추가, 슬롯 저장·불러오기, 시점 바꾸기까지 말로 시키세요. 바뀌는 내용은 먼저 보여 드리고, 승인하면 적용해요.');
 setOpen(matchMedia('(min-width:1200px)').matches);
 })();
 </script>

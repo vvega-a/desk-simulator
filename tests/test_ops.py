@@ -13,7 +13,7 @@ COLLECTIONS = {
         {"key": "w", "label": "가로", "type": "range", "min": 250, "max": 1200, "step": 10, "unit": "mm"},
         {"key": "tiers", "label": "서랍 칸 수", "type": "range", "min": 1, "max": 6, "step": 1, "unit": "단"},
         {"key": "casters", "label": "바퀴", "type": "toggle"}]},
-    "extraDesks": {"label": "추가 책상", "max": 3, "first": 2, "fields": [
+    "extraDesks": {"label": "추가 책상", "item_label": "책상", "max": 3, "first": 2, "fields": [
         {"key": "w", "label": "가로", "type": "range", "min": 400, "max": 2400, "step": 10, "unit": "mm"}]},
 }
 DRAWER = {"where": "underL", "w": 400, "tiers": 3, "casters": True}
@@ -39,22 +39,22 @@ def test_add_respects_max_including_earlier_ops():
 
 def test_update_keeps_only_changed_values_and_shows_diff():
     ops, items, problems, _ = validate_ops(
-        [{"op": "update", "collection": "drawers", "index": 0, "values": {"w": 500, "tiers": 3}}], COLLECTIONS, WITH_DRAWER)
+        [{"op": "update", "collection": "drawers", "number": 1, "values": {"w": 500, "tiers": 3}}], COLLECTIONS, WITH_DRAWER)
     assert ops == [{"op": "update", "collection": "drawers", "index": 0, "values": {"w": 500}}]
-    assert items == [{"key": "drawers.0.w", "label": "서랍장 1: 가로", "from": "400mm", "to": "500mm"}] and not problems
+    assert items == [{"key": "drawers.1.w", "label": "서랍장 1: 가로", "from": "400mm", "to": "500mm"}] and not problems
 
 
 def test_update_with_no_change_is_a_problem():
     ops, items, problems, _ = validate_ops(
-        [{"op": "update", "collection": "drawers", "index": 0, "values": {"w": 400}}], COLLECTIONS, WITH_DRAWER)
+        [{"op": "update", "collection": "drawers", "number": 1, "values": {"w": 400}}], COLLECTIONS, WITH_DRAWER)
     assert not ops and not items and "이미 그 값" in problems[0]
 
 
 def test_remove_and_bad_index():
     ops, items, problems, _ = validate_ops([
-        {"op": "remove", "collection": "drawers", "index": 0},
-        {"op": "remove", "collection": "drawers", "index": 0},  # 이미 하나 지웠으니 더 없다
-        {"op": "update", "collection": "extraDesks", "index": 1, "values": {"w": 800}},
+        {"op": "remove", "collection": "drawers", "number": 1},
+        {"op": "remove", "collection": "drawers", "number": 1},  # 이미 하나 지웠으니 더 없다
+        {"op": "update", "collection": "extraDesks", "number": 1, "values": {"w": 800}},  # 추가 책상은 2번부터라 1번은 없다
     ], COLLECTIONS, WITH_DRAWER)
     assert ops == [{"op": "remove", "collection": "drawers", "index": 0}]
     assert items[0]["label"] == "서랍장 1 삭제"
@@ -63,13 +63,14 @@ def test_remove_and_bad_index():
 
 def test_numbering_follows_first_label():
     state = {**STATE, "extraDesks": [{"w": 1000}]}
-    _, items, _, _ = validate_ops([{"op": "update", "collection": "extraDesks", "index": 0, "values": {"w": 1200}}], COLLECTIONS, state)
-    assert items[0]["label"] == "추가 책상 2: 가로"  # 화면에서는 2번부터 보인다
+    ops, items, _, _ = validate_ops([{"op": "update", "collection": "extraDesks", "number": 2, "values": {"w": 1200}}], COLLECTIONS, state)
+    assert items[0]["label"] == "책상 2: 가로"  # 화면과 같은 이름·번호
+    assert ops[0]["index"] == 0  # 브라우저에는 내부 위치로 보낸다
 
 
 def test_unknown_collection_and_op():
     ops, _, problems, _ = validate_ops(
-        [{"op": "add", "collection": "lamps"}, {"op": "explode", "collection": "drawers", "index": 0}, "x"], COLLECTIONS, WITH_DRAWER)
+        [{"op": "add", "collection": "lamps"}, {"op": "explode", "collection": "drawers", "number": 1}, "x"], COLLECTIONS, WITH_DRAWER)
     assert not ops and len(problems) == 3
 
 
@@ -87,13 +88,14 @@ def test_format_settings_lists_collections():
     overview = format_settings(SCHEMA, None, COLLECTIONS)
     assert "collection=drawers" in overview and "최대 4개" in overview
     detail = format_settings(SCHEMA, "서랍장", COLLECTIONS)
-    assert "번호(index)는 0부터" in detail and "tiers" in detail and "250~1200mm" in detail
+    assert "서랍장 1" in detail and "number" in detail and "index" not in detail and "tiers" in detail and "250~1200mm" in detail
     assert "추가 책상" in format_settings(SCHEMA, "없음", COLLECTIONS)
 
 
 def test_describe_lists_items_with_index_and_slots():
     out = describe(WITH_DRAWER, [], SLOTS)
-    assert "서랍장 1개 (번호는 0부터)" in out and "[0] where=underL, w=400" in out
+    assert "서랍장 1개:" in out and "  서랍장 1: where=underL, w=400" in out
+    assert "[0]" not in out  # 0부터 세는 번호는 어디에도 나오지 않는다
     assert "저장 슬롯: A:" in out and "B: 비어 있음" in out
 
 
@@ -222,3 +224,41 @@ def test_no_notice_for_plain_answers():
     llm = FakeLLM(text("눈과 화면 거리가 조금 가까워요."))
     _, events = run(llm)
     assert "실제로" not in events[-1]["answer"]
+
+
+# ---- 번호 통일: 화면·카드·에이전트가 같은 '이름 번호'를 쓴다 ------------------------------------
+
+def test_every_item_is_numbered_the_same_way_everywhere():
+    state = {**STATE, "subCount": 2, "sub": "24", "extraDesks": [{"place": "right", "w": 1000}, {"place": "left", "w": 800}],
+             "drawers": [DRAWER, DRAWER]}
+    out = describe(state, [])
+    assert "책상 1: " in out and "모니터 1: " in out and "모니터 2·3: " in out  # 모니터는 메인/보조로 나누지 않고 번호만
+    assert "  책상 2: place=right" in out and "  책상 3: place=left" in out  # 추가 책상은 2번부터 이어진다
+    assert "  서랍장 1:" in out and "  서랍장 2:" in out
+    # 에이전트가 화면 번호 그대로 말해도 같은 물건이 가리켜진다
+    ops, items, _, _ = validate_ops([{"op": "remove", "collection": "extraDesks", "number": 3}], COLLECTIONS, state)
+    assert items[0]["label"] == "책상 3 삭제" and ops[0]["index"] == 1
+
+
+def test_zero_based_number_is_rejected_with_the_valid_range():
+    _, _, problems, _ = validate_ops([{"op": "remove", "collection": "drawers", "number": 0}], COLLECTIONS, WITH_DRAWER)
+    assert "1~1번" in problems[0]
+    _, _, problems, _ = validate_ops([{"op": "remove", "collection": "drawers", "number": 1}], COLLECTIONS, {**STATE, "drawers": []})
+    assert "없음" in problems[0]
+
+
+def test_add_label_uses_the_on_screen_name():
+    _, items, _, _ = validate_ops([{"op": "add", "collection": "extraDesks"}], COLLECTIONS, STATE)
+    assert items[0]["label"] == "책상 추가"
+
+
+def test_result_after_remove_reports_renumbered_items():
+    llm = FakeLLM(call("ProposeChanges", {"array_ops": [{"op": "remove", "collection": "extraDesks", "number": 2}], "reason": "정리"}),
+                  text("지웠어요."))
+    state = {**STATE, "extraDesks": [{"place": "right", "w": 1000}, {"place": "left", "w": 800}]}
+    g, events = run(llm, "책상 2 삭제", collections=COLLECTIONS, slots=SLOTS, state=state)
+    assert events[-1]["type"] == "approval" and events[-1]["changes"][0]["label"] == "책상 2 삭제"
+    after = {**STATE, "extraDesks": [{"place": "left", "w": 800}]}  # 지운 뒤 브라우저의 상태: 남은 하나가 이제 책상 2
+    list(agent.resume_stream(g, "t1", True, {"ops": [{"ok": True, "text": "책상 2 삭제"}]}, CHECKS, after))
+    seen = tool_messages(llm, 1)[-1]
+    assert "적용 뒤 현재 번호" in seen and "  책상 2: place=left, w=800" in seen and "책상 3" not in seen

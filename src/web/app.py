@@ -7,7 +7,7 @@
                           window.deskSim.getState()/getChecks()/schema()/collections()/slots() 값. 서버는 상태를 보관하지 않는다.
                           끝은 {type: done, message}, {type: error, message}, 또는 승인 대기 {type: approval, thread_id, ...}.
   POST /api/chat/approve  승인 대기 중인 설정 변경에 대한 사용자의 결정을 받아 이어서 진행한다(SSE).
-                          본문: {thread_id, approve, result?, checks?} — result는 브라우저가 applyChanges로 적용한 결과,
+                          본문: {thread_id, approve, result?, checks?, state?} — result는 브라우저가 applyChanges로 적용한 결과,
                           checks는 적용 뒤 점검 결과.
 """
 import contextlib
@@ -56,6 +56,7 @@ class ApproveRequest(BaseModel):
     approve: bool
     result: dict = Field(default_factory=dict)
     checks: list[dict] = Field(default_factory=list, max_length=40)
+    state: dict = Field(default_factory=dict)  # 적용 뒤의 deskSim.getState(). 번호가 바뀐 목록을 에이전트가 읽는다
 
 
 @functools.lru_cache(maxsize=1)
@@ -120,6 +121,6 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
 @app.post("/api/chat/approve")
 def chat_approve(req: ApproveRequest) -> StreamingResponse:
     def events():
-        yield from agent.resume_stream(get_graph(), req.thread_id, req.approve, req.result, req.checks)
+        yield from agent.resume_stream(get_graph(), req.thread_id, req.approve, req.result, req.checks, req.state)
 
     return _sse_response(events())

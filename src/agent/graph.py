@@ -30,7 +30,7 @@ from langgraph.graph.message import add_messages
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
-from src.agent.context import describe, describe_checks
+from src.agent.context import describe, describe_checks, describe_collections
 from src.agent.settings import (
     VIEW_NAMES, diff_items, format_settings, validate_ops, validate_patch, validate_scene_action,
 )
@@ -42,7 +42,7 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 할 수 있는 일:
 - 단일 설정 바꾸기(책상·모니터·키보드·방 등): propose_changes의 changes
 - 물건 추가·수정·삭제(추가 책상·서랍장·모니터+노트북 세트·타공판): propose_changes의 array_ops
-- 보조 모니터·노트북·PC 본체·스피커·의자·방·데스크매트·키보드/마우스 추가·삭제: changes에서 해당 설정 켜기/끄기(list_settings로 키 확인)
+- 모니터 추가·삭제(모니터 1은 항상 있고, 모니터 2·3은 subCount 설정으로), 노트북·PC 본체·스피커·의자·방·데스크매트·키보드/마우스 추가·삭제: changes에서 해당 설정 켜기/끄기(list_settings로 키 확인)
 - 초기화, 저장 슬롯(A·B·C) 저장·불러오기: scene_action
 - 화면 시점(사선·정면·위에서·옆·앉은 시점)과 자동 회전: set_view
 
@@ -51,7 +51,8 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 - 점검 결과의 '문제'·'주의' 항목을 먼저 짚고, 어떻게 바꾸면 좋을지 구체적인 값(mm 등)으로 제안해.
 - 설정을 바꾸기 전에 list_settings로 정확한 키와 허용값을 확인해. 물건을 추가·수정할 때는 해당 물건 이름(예: 서랍장)을 section으로 조회해.
 - propose_changes·scene_action은 사용자가 승인해야 적용돼. 관련된 변경은 한 번에 모아서 제안하고, 한 턴에 propose_changes와 scene_action은 각각 한 번만 호출해.
-- array_ops에서 수정·삭제할 물건은 '현재 셋업'에 적힌 번호(index, 0부터)로 지정해. 여러 개를 지울 때는 번호가 당겨지지 않도록 큰 번호부터 지워.
+- 모든 물건에는 화면과 같은 '이름 번호'가 있어(책상 1, 추가 책상은 책상 2부터, 서랍장 1, 타공판 1 …). 사용자에게도 이 이름으로 말해.
+- array_ops에서 수정·삭제할 물건은 그 번호를 number로 그대로 써(서랍장 2면 number=2, 책상 2면 number=2). 0부터 세지 마. 책상 1은 array_ops가 아니라 changes의 책상 설정으로 바꿔. 여러 개를 지울 때는 번호가 당겨지니 큰 번호부터 지워.
 - 도구 결과에 '적용했어요'가 나오기 전에는 바꿨다고 말하지 마. 결과의 새 점검 결과를 보고 좋아졌는지 알려 줘.
 - 이전 대화의 '완료했어요'는 그때 도구를 불러 실제로 적용한 결과였어. 이번 요청의 변경·추가·삭제·저장도 반드시 도구를 새로 불러야 하고, 도구를 부르지 않았다면 했다고 절대 말하지 마.
 - 사용자가 거절하면 다시 졸라대지 말고 다른 대안만 짧게 말해.
@@ -70,7 +71,7 @@ class ListSettings(BaseModel):
 
     section: str | None = Field(
         default=None,
-        description="섹션 이름(책상, 방, 메인 모니터, 보조 모니터, 입력 장치, 기타 물건) 또는 물건 이름(추가 책상, 서랍장, 모니터+노트북 세트, 타공판). 비우면 전체 키 목록.",
+        description="섹션 이름(책상, 방, 모니터 1, 모니터 2, 입력 장치, 기타 물건) 또는 물건 이름(추가 책상, 서랍장, 모니터+노트북 세트, 타공판). 비우면 전체 키 목록.",
     )
 
 
@@ -81,7 +82,9 @@ class ArrayOp(BaseModel):
     collection: Literal["extraDesks", "drawers", "sets", "pegs"] = Field(
         description="extraDesks=추가 책상, drawers=서랍장, sets=모니터+노트북 세트, pegs=타공판"
     )
-    index: int | None = Field(default=None, description="update·remove에서 대상 번호(0부터). add에서는 쓰지 않는다.")
+    number: int | None = Field(
+        default=None, description="update·remove에서 대상의 화면 번호(서랍장 2 → 2, 책상 2 → 2). 0부터 세지 않는다. add에서는 쓰지 않는다."
+    )
     values: dict[str, Any] = Field(default_factory=dict, description="add·update에서 정할 값 {키: 값}. add에서 비우면 기본값.")
 
 
@@ -205,6 +208,9 @@ def _outcome_text(decision: dict, problems: list[str]) -> str:
         text += " / 적용하지 못한 것: " + "; ".join(bad)
     if problems:
         text += " / 검증에서 거절된 것: " + "; ".join(problems)
+    after = describe_collections(decision.get("state") or {})
+    if after:  # 지우면 뒤 번호가 당겨지므로, 적용 뒤의 번호를 알려 줘 낡은 번호로 말하지 않게 한다
+        text += "\n적용 뒤 현재 번호:\n" + "\n".join(after)
     if decision.get("checks"):
         text += "\n" + describe_checks(decision["checks"])
     return text
@@ -379,7 +385,8 @@ def ask_stream(graph, question: str, history: list[dict], desk_state: dict, chec
     yield from _run(graph, payload, thread_id or uuid.uuid4().hex)
 
 
-def resume_stream(graph, thread_id: str, approve: bool, result: dict | None = None, checks: list[dict] | None = None):
-    """승인(True)·취소(False)로 멈춘 호출을 이어서 진행한다. result는 브라우저가 적용한 결과, checks는 적용 뒤 점검 결과."""
-    decision = {"approve": bool(approve), "result": result or {}, "checks": checks or []}
+def resume_stream(graph, thread_id: str, approve: bool, result: dict | None = None, checks: list[dict] | None = None,
+                  state: dict | None = None):
+    """승인(True)·취소(False)로 멈춘 호출을 이어서 진행한다. result는 브라우저가 적용한 결과, checks·state는 적용 뒤 점검 결과와 상태."""
+    decision = {"approve": bool(approve), "result": result or {}, "checks": checks or [], "state": state or {}}
     yield from _run(graph, Command(resume=decision), thread_id)

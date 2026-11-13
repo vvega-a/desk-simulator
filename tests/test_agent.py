@@ -18,10 +18,10 @@ STATE = {
 CHECKS = [{"title": "눈 ↔ 화면 거리", "value": "약 620 mm", "status": "warn", "note": "권장 670~870mm"}]
 SCHEMA = [
     {"key": "deskW", "label": "가로 (폭)", "section": "책상", "type": "range", "min": 600, "max": 2400, "step": 10, "unit": "mm"},
-    {"key": "mon", "label": "모델", "section": "메인 모니터", "type": "select",
+    {"key": "mon", "label": "모델", "section": "모니터 1", "type": "select",
      "options": [{"value": "27", "label": '27" 16:9'}, {"value": "32", "label": '32" 16:9'}]},
     {"key": "speakers", "label": "북쉘프 스피커", "section": "기타 물건", "type": "toggle"},
-    {"key": "subCount", "label": "개수", "section": "보조 모니터", "type": "seg",
+    {"key": "subCount", "label": "개수", "section": "모니터 2", "type": "seg",
      "options": [{"value": 0, "label": "없음"}, {"value": 1, "label": "1대"}, {"value": 2, "label": "2대 (양옆)"}]},
 ]
 
@@ -108,7 +108,7 @@ def test_format_settings_lists_sections_and_ranges():
     assert "[책상] deskW" in format_settings(SCHEMA)
     detail = format_settings(SCHEMA, "책상")
     assert "600~2400mm, 10mm 단위" in detail
-    assert "27=" in format_settings(SCHEMA, "메인 모니터")
+    assert "27=" in format_settings(SCHEMA, "모니터 1")
     assert "섹션이 없어요" in format_settings(SCHEMA, "없는섹션")
 
 
