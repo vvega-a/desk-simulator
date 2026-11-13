@@ -77,6 +77,34 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
 .ck.ok{--c:var(--ok)} .ck.warn{--c:var(--warn)} .ck.bad{--c:var(--bad)} .ck.info{--c:var(--accent)}
 .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:14px;text-align:center;padding:20px}
 
+/* 아이템 목록 + 추가 메뉴 (왼쪽 패널) */
+.items{display:grid;gap:6px;margin-bottom:10px;max-height:340px;overflow-y:auto;padding:1px}
+.it{display:flex;gap:4px;align-items:stretch}
+.it-main{flex:1;min-width:0;text-align:left;border:1px solid var(--line);background:#fafaf8;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:1px;min-height:44px}
+.it-main b{font-size:13px;font-weight:700}
+.it-main small{font-size:11.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it.on .it-main{border-color:var(--accent);background:#eef3ff;box-shadow:inset 3px 0 0 var(--accent)}
+.it-del{flex:none;width:44px;border:1px solid var(--line);background:#fff;border-radius:10px;color:var(--sub);font-size:18px;line-height:1}
+.it-del:hover{color:var(--bad);border-color:#f3c9c9}
+.addmenu{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.addmenu[hidden]{display:none}
+.addmenu button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;text-align:left;font-size:12.5px;font-weight:600;min-height:44px;display:flex;flex-direction:column;justify-content:center}
+.addmenu button small{font-size:11px;color:var(--sub);font-weight:400}
+.addmenu button:disabled{opacity:.5;cursor:default}
+/* 선택한 아이템의 상세 설정 (3D 아래) */
+.detail{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 18px 6px;max-height:38vh;overflow-y:auto;flex:0 1 auto;min-height:120px}
+.d-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.d-head h3{margin:0;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.d-head p{margin:2px 0 0;font-size:12px;color:var(--sub)}
+.d-del{flex:none;border:1px solid #f3c9c9;background:#fff;color:var(--bad);border-radius:9px;padding:0 12px;min-height:44px;font-weight:700;font-size:12.5px}
+.detail [hidden]{display:none!important}
+.detail .grp.scalar{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:2px 28px;align-content:start}
+.detail .grp .note{grid-column:1/-1;margin:0 0 12px}
+.detail .xd{border:0;background:none;padding:0;margin:0;column-width:260px;column-gap:28px}
+.detail .xd .xh{display:none}
+.detail .xd .row,.detail .xd .seg,.detail .xd .chips{break-inside:avoid}
+.detail .xd .lab{break-after:avoid}
+#detailMobile .detail{max-height:none;overflow:visible;margin-top:12px}
 .app.chat-open{grid-template-columns:350px 1fr 360px}
 .chat{display:none;flex-direction:column;min-height:0;background:#fff;border-left:1px solid var(--line)}
 .app.chat-open .chat{display:flex}
@@ -115,6 +143,7 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
   .chat{position:fixed;top:0;right:0;bottom:0;width:380px;z-index:20;box-shadow:-8px 0 24px rgba(0,0,0,.14)}
 }
 @media (max-width:880px){
+  .items{max-height:none}
   .app.chat-open{grid-template-columns:1fr}
   .chat{left:0;right:0;top:auto;bottom:0;width:auto;height:62vh;height:62dvh;border-left:0;border-radius:18px 18px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.14)}
 }
@@ -160,7 +189,13 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
       <h1>데스크 셋업 시뮬레이터</h1>
       <p>모든 물체는 실제 mm 치수로 그려져요.</p>
     </header>
-    <div id="controls"></div>
+    <section class="items-sec">
+      <h3>아이템</h3>
+      <div class="items" id="itemList"></div>
+      <button type="button" class="add" id="itemAdd" aria-expanded="false" aria-controls="addMenu">+ 아이템 추가</button>
+      <div class="addmenu" id="addMenu" hidden></div>
+    </section>
+    <div id="detailMobile"></div>
     <section>
       <h3>비교용 저장</h3>
       <div class="slots" id="slots"></div>
@@ -191,7 +226,7 @@ select{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10p
       <button class="btn" id="reset">↺ 시점 초기화</button>
       <button class="btn" id="chatToggle" aria-expanded="false" aria-controls="chat">AI 채팅</button>
     </div>
-    <div class="checks" id="checks"></div>
+    <div class="detail" id="detail" role="region" aria-label="선택한 아이템 설정"></div>
   </main>
 
   <aside class="chat" id="chat" aria-label="AI 채팅">
@@ -312,15 +347,50 @@ const UI=[
  ]},
 ];
 
-/* ---------- panel ---------- */
+/* ---------- 아이템 목록(왼쪽) + 선택한 아이템의 상세 설정(아래) ---------- */
+const MOUNT_NAME={stand:'기본 스탠드',arm:'모니터암',armLap:'모니터+노트북 암'};
+const TOWER_NAME={deskL:'책상 왼쪽',deskR:'책상 오른쪽',floor:'바닥'};
+// 배열로 여러 개 놓는 물건. addBtn은 기존 추가 로직(기본값 계산 포함)을 그대로 쓰기 위한 버튼
+const ARR=[
+  {key:'extraDesks',box:'extra',label:'추가 책상',first:2,max:3,addBtn:'#addDesk',sum:e=>`${e.w}×${e.d} · ${(PLACES.find(p=>p.v===e.place)||{}).l||''}`},
+  {key:'drawers',box:'drawers',label:'서랍장',first:1,max:4,addBtn:'#addDrawer',sum:e=>`${e.w}×${e.d}×${e.h} · ${e.tiers}단`},
+  {key:'sets',box:'sets',label:'모니터+노트북 세트',first:1,max:4,addBtn:'#addSet',sum:e=>`${MONITORS[e.mon].short}${e.lap?' + 노트북':''}`},
+  {key:'pegs',box:'pegs',label:'타공판',first:1,max:4,addBtn:'#addPeg',sum:e=>`${e.w}×${e.h}`},
+];
+// 하나만 있는 물건. keys는 UI 배열의 설정 항목 키. fixed는 항상 있고 지울 수 없는 것
+const ITEM_DEFS=[
+  {id:'basic',label:'내 키 · 표시',fixed:true,keys:['userH','dims'],sum:()=>`키 ${S.userH}cm`},
+  {id:'desk',label:'책상',fixed:true,keys:['deskW','deskD','deskH','deskColor','frameColor'],sum:()=>`${S.deskW}×${S.deskD} · H ${S.deskH}`},
+  {id:'mon',label:'메인 모니터',fixed:true,keys:['mon','curved','mount','lapSide','lapSize','lapAngle','monBack','monLift','monX','armX'],sum:()=>`${MONITORS[S.mon].short} · ${MOUNT_NAME[S.mount]}`},
+  {id:'sub',label:'보조 모니터',keys:['subCount','subSide','sub','subPortrait','subAngle'],on:()=>S.subCount>0,add:()=>set('subCount',1),remove:()=>set('subCount',0),sum:()=>`${MONITORS[S.sub].short} × ${S.subCount}`},
+  {id:'kbm',label:'키보드 · 마우스',keys:['kb','theme','mouse'],on:()=>S.kb!=='none'||S.mouse,add:()=>{set('kb','tkl');set('mouse',true)},remove:()=>{set('kb','none');set('mouse',false)},sum:()=>`${KB_NAME[S.kb]}${S.mouse?' + 마우스':''}`},
+  {id:'mat',label:'데스크매트',keys:['mat','matColor'],on:()=>S.mat!=='none',add:()=>set('mat','900x400'),remove:()=>set('mat','none'),sum:()=>S.mat.replace('x',' × ')+' mm'},
+  {id:'laptop',label:'노트북',keys:['laptop'],on:()=>S.laptop!=='none',add:()=>set('laptop','14'),remove:()=>set('laptop','none'),sum:()=>`${S.laptop}"`},
+  {id:'tower',label:'PC 본체',keys:['tower'],on:()=>S.tower!=='none',add:()=>set('tower','deskR'),remove:()=>set('tower','none'),sum:()=>TOWER_NAME[S.tower]},
+  {id:'speakers',label:'스피커',keys:[],note:'북쉘프 스피커는 모니터 양옆에 자동으로 놓여요. 색은 키보드·마우스 색을 따라가요.',on:()=>S.speakers,add:()=>set('speakers',true),remove:()=>set('speakers',false),sum:()=>'북쉘프 2개'},
+  {id:'chair',label:'의자',keys:[],note:'책상 앞에 놓여요. 크기는 「내 키 · 표시」의 키에 맞춰 그려져요.',on:()=>S.chair,add:()=>set('chair',true),remove:()=>set('chair',false),sum:()=>`키 ${S.userH}cm 기준`},
+  {id:'room',label:'방',keys:['roomW','roomD','roomH','roomX','roomGap','wallColor','floorColor','win','winW','winX','door','doorWall'],on:()=>S.room,add:()=>set('room',true),remove:()=>set('room',false),sum:()=>`${S.roomW}×${S.roomD}`},
+];
+let sel='desk'; // 선택한 아이템: 단일 물건은 id, 배열 물건은 'drawers:0'처럼 키:번호
+
 const rows=[];
 function norm(o){return typeof o==='object'?o:{v:o,l:String(o)}}
 function cast(k,v){return typeof DEFAULTS[k]==='number'?Number(v):typeof DEFAULTS[k]==='boolean'?!!v:String(v)}
+function mkGroup(item,cls){const g=document.createElement('div');g.className='grp '+cls;g.dataset.item=item;return g}
 function renderPanel(){
-  const root=$('#controls');
+  const root=$('#detail');
+  root.innerHTML='<div class="d-head"><div><h3 id="dTitle"></h3><p id="dSub"></p></div><button type="button" class="d-del" id="dDel">이 아이템 삭제</button></div>';
+  const groups={};
+  for(const d of ITEM_DEFS){
+    const g=groups[d.id]=mkGroup(d.id,'scalar');
+    if(d.note)g.innerHTML=`<p class="note">${d.note}</p>`;
+    root.appendChild(g);
+  }
+  for(const a of ARR){const g=mkGroup(a.key,'arr');g.innerHTML=`<div id="${a.box}"></div>`;root.appendChild(g)}
   for(const sec of UI){
-    const s=document.createElement('section');s.innerHTML=`<h3>${sec.sec}</h3>`;
     for(const it of sec.items){
+      const def=ITEM_DEFS.find(d=>d.keys.includes(it.k));
+      if(!def)continue; // 방·스피커·의자 켜기/끄기는 아이템 추가·삭제가 맡는다
       const r=document.createElement('div');r.className='row';
       let h='';
       if(it.type==='toggle'){h=`<label class="tg"><span>${it.t}</span><input type="checkbox"><i></i></label>`}
@@ -331,19 +401,86 @@ function renderPanel(){
         if(it.type==='swatch')h+=`<div class="sw">${it.opts.map(o=>`<button data-v="${o.v}" title="${o.l}" style="--c:${o.v}"></button>`).join('')}</div>`;
         if(it.type==='select')h+=`<select>${it.opts.map(o=>`<option value="${o.v}">${o.l}</option>`).join('')}</select>`;
       }
-      r.innerHTML=h;s.appendChild(r);rows.push({it,r});
-      const rng=r.querySelector('input[type=range]'),num=r.querySelector('.num'),sel=r.querySelector('select'),cb=r.querySelector('input[type=checkbox]');
+      r.innerHTML=h;groups[def.id].appendChild(r);rows.push({it,r});
+      const rng=r.querySelector('input[type=range]'),num=r.querySelector('.num'),dd=r.querySelector('select'),cb=r.querySelector('input[type=checkbox]');
       if(rng)rng.addEventListener('input',()=>set(it.k,rng.value));
       if(num)num.addEventListener('change',()=>{let v=Math.min(it.max,Math.max(it.min,Number(num.value)||it.min));set(it.k,v)});
-      if(sel)sel.addEventListener('change',()=>set(it.k,sel.value));
+      if(dd)dd.addEventListener('change',()=>set(it.k,dd.value));
       if(cb)cb.addEventListener('change',()=>set(it.k,cb.checked));
       r.querySelectorAll('button[data-v]').forEach(b=>b.addEventListener('click',()=>set(it.k,b.dataset.v)));
     }
-    root.appendChild(s);
-    if(sec.sec==='책상'){const x=document.createElement('section');x.innerHTML='<h3>추가 책상</h3><div id="extra"></div>';root.appendChild(x);const y=document.createElement('section');y.innerHTML='<h3>서랍장</h3><div id="drawers"></div>';root.appendChild(y);const q=document.createElement('section');q.innerHTML='<h3>타공판</h3><div id="pegs"></div>';root.appendChild(q)}
-    if(sec.sec==='보조 모니터'){const z=document.createElement('section');z.innerHTML='<h3>모니터+노트북 세트 추가</h3><div id="sets"></div>';root.appendChild(z)}
   }
+  $('#dDel').addEventListener('click',()=>removeItem(sel));
+  $('#itemList').addEventListener('click',e=>{
+    const del=e.target.closest('.it-del'),main=e.target.closest('.it-main');
+    if(del)removeItem(del.dataset.id);
+    else if(main){sel=main.dataset.id;renderItems();$('#itemList .it.on .it-main')?.focus()}
+  });
+  $('#itemAdd').addEventListener('click',()=>toggleAddMenu());
+  $('#addMenu').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-i]');if(!b||b.disabled)return;
+    addables()[Number(b.dataset.i)].run();toggleAddMenu(false);renderItems();$('#itemList .it.on .it-main')?.focus();
+  });
+  matchMedia('(max-width:880px)').addEventListener('change',placeDetail);
+  placeDetail();
 }
+// 좁은 화면에서는 3D 아래 공간이 없어서 상세 설정을 왼쪽 패널의 아이템 목록 바로 아래로 옮긴다
+function placeDetail(){
+  const d=$('#detail'),mobile=matchMedia('(max-width:880px)').matches;
+  (mobile?$('#detailMobile'):document.querySelector('main.stage')).appendChild(d);
+}
+function listItems(){
+  const out=[];
+  for(const d of ITEM_DEFS)if(d.fixed||d.on())out.push({id:d.id,label:d.label,sum:d.sum(),fixed:!!d.fixed});
+  for(const a of ARR)S[a.key].forEach((e,i)=>out.push({id:a.key+':'+i,label:`${a.label} ${i+a.first}`,sum:a.sum(e),fixed:false}));
+  return out;
+}
+function addables(){
+  const out=[];
+  for(const d of ITEM_DEFS)if(!d.fixed)out.push({label:d.label,off:d.on()?'이미 추가됨':'',run:()=>{d.add();sel=d.id}});
+  for(const a of ARR)out.push({label:a.label,off:S[a.key].length>=a.max?`최대 ${a.max}개`:'',run:()=>{const b=$(a.addBtn);if(b)b.click();sel=a.key+':'+(S[a.key].length-1)}});
+  return out;
+}
+function toggleAddMenu(open){
+  const m=$('#addMenu'),b=$('#itemAdd');if(open===undefined)open=m.hidden;
+  m.hidden=!open;b.setAttribute('aria-expanded',String(open));b.textContent=open?'닫기':'+ 아이템 추가';
+}
+function removeItem(id){
+  const [type,idx]=id.split(':');
+  if(idx===undefined){const d=ITEM_DEFS.find(d=>d.id===type);if(d&&!d.fixed)d.remove()}
+  else{const a=ARR.find(a=>a.key===type);const x=document.getElementById(a.box).querySelectorAll(':scope > .xd')[Number(idx)];x&&x.querySelector('.del').click()}
+  if(sel===id)sel='desk';
+  renderItems();
+}
+function renderItems(){
+  const L=listItems();
+  if(!L.some(x=>x.id===sel))sel='desk';
+  $('#itemList').innerHTML=L.map(x=>`<div class="it${x.id===sel?' on':''}"><button type="button" class="it-main" data-id="${x.id}" aria-pressed="${x.id===sel}"><b>${x.label}</b><small>${x.sum}</small></button>${x.fixed?'':`<button type="button" class="it-del" data-id="${x.id}" aria-label="${x.label} 삭제">×</button>`}</div>`).join('');
+  const items=addables();
+  $('#addMenu').innerHTML=items.map((x,i)=>`<button type="button" data-i="${i}"${x.off?' disabled':''}>${x.label}${x.off?`<small>${x.off}</small>`:''}</button>`).join('');
+  syncDetail(L);
+}
+// 선택한 아이템의 설정만 보여 준다. 배열 물건은 기존 편집 블록(.xd) 중 선택한 번호만 남긴다
+function syncDetail(L){
+  const d=$('#detail');if(!d||!rows.length)return;
+  const [type,idx]=sel.split(':');
+  d.querySelectorAll('.grp').forEach(g=>{g.hidden=g.dataset.item!==type});
+  for(const a of ARR){
+    const box=document.getElementById(a.box);if(!box)continue;let i=0;
+    for(const ch of box.children){
+      if(ch.classList.contains('xd')){ch.hidden=!(type===a.key&&String(i)===idx);i++}
+      else ch.hidden=true; // 아래쪽의 추가 버튼·안내는 쓰지 않는다(추가는 왼쪽 메뉴)
+    }
+  }
+  const cur=(L||listItems()).find(x=>x.id===sel);
+  if(cur){$('#dTitle').textContent=cur.label;$('#dSub').textContent=cur.sum;$('#dDel').hidden=cur.fixed}
+}
+// 기존 편집 블록이 다시 그려질 때마다(추가·삭제·종류 변경) 선택한 것만 보이게 맞춘다
+{const f=renderExtra;renderExtra=function(){f();syncDetail()}}
+{const f=renderDrawers;renderDrawers=function(){f();syncDetail()}}
+{const f=renderSets;renderSets=function(){f();syncDetail()}}
+{const f=renderPegs;renderPegs=function(){f();syncDetail()}}
+
 function renderExtra(){
   if($('#sets'))setTimeout(renderSets,0);
   if($('#pegs'))setTimeout(renderPegs,0);
@@ -946,7 +1083,7 @@ function build(){
   deskG.updateMatrixWorld(true);const deskBox=room?new THREE.Box3(V(room.xl,0,room.zb),V(room.xr,S.deskH,room.zf)):new THREE.Box3().setFromObject(deskG);
   root.updateMatrixWorld(true);const allBox=new THREE.Box3();[deskG,items,extra].forEach(o=>allBox.expandByObject(o));
   info={room,allBox,deskBox,main,mainZ,mainCY,monBox,itemBox,kb,kbZ,mons,curved};
-  updateCards();renderChecks();
+  updateCards();renderChecks();renderItems(); // 어떤 설정이 바뀌어도(배열 아이템 편집 포함) 목록 요약이 따라가게
 }
 let pending=0;function schedule(){if(pending)return;pending=requestAnimationFrame(()=>{pending=0;build()})}
 function flush(){if(pending){cancelAnimationFrame(pending);pending=0;build()}} // 예약된 다시 그리기를 지금 끝낸다(적용 직후 점검 결과를 읽을 때)
@@ -1003,7 +1140,7 @@ function renderChecks(){
     else out.push({t:'서랍장',v:`${S.drawers.length}개 · 책상 옆`,s:'info',n:'옆 서랍장은 위에 물건을 올려두기 좋아요'});
   }
   lastChecks=out.map(c=>({title:c.t,value:c.v,status:c.s,note:c.n}));
-  $('#checks').innerHTML=out.map(c=>`<div class="ck ${c.s}"><div class="t">${c.t}</div><div class="v">${c.v}</div><div class="n">${c.n}</div></div>`).join('');
+  // 점검 결과는 화면에 그리지 않는다. lastChecks만 채팅 에이전트가 deskSim.getChecks()로 읽는다
 }
 
 /* ---------- camera ---------- */
