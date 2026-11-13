@@ -67,6 +67,9 @@ def describe_collections(state: dict, collections: dict | None = None) -> list[s
     for key, (label, item, first) in COLLECTIONS.items():
         items = state.get(key) or []
         if not items:
+            # 없다는 것도 적는다. 빠뜨리면 모델이 '모니터 2를 추가했어요' 같은 이전 대화를 보고 아직 있다고 믿는다
+            if key in state:
+                lines.append(f"{label}: 없음" + (" (모니터는 모니터 1 하나뿐)" if key == "monitors" else ""))
             continue
         spec = (collections or {}).get(key) or {}
         cap = ""
@@ -84,3 +87,44 @@ def describe_checks(checks: list[dict]) -> str:
     for c in checks:
         lines.append(f"- [{STATUS.get(c.get('status'), c.get('status'))}] {c.get('title')}: {c.get('value')} — {c.get('note')}")
     return "\n".join(lines)
+
+
+MAX_CHANGES = 15  # 직접 바꾼 내용을 이만큼까지만 적는다(나머지는 개수만)
+
+
+def _show(v) -> str:
+    if isinstance(v, bool):
+        return "켬" if v else "끔"
+    return str(v)
+
+
+def describe_changes(prev: dict | None, cur: dict, schema: list[dict] | None = None, collections: dict | None = None) -> list[str]:
+    """지난 답변 뒤 사용자가 화면에서 직접 바꾼 것(마우스로 옮기기, 목록에서 삭제, 슬라이더 등)을 줄로 만든다.
+
+    브라우저가 지난 답변을 마친 때의 상태(prev)를 같이 보내면 지금 상태(cur)와 비교한다. 이걸 질문 바로 앞에 붙여
+    모델이 이전 대화의 '추가했어요'·'적용 뒤 현재 번호'보다 지금 화면을 믿게 한다.
+    """
+    if not prev:
+        return []
+    labels = {f["key"]: (f.get("section") or "", f.get("label") or f["key"]) for f in schema or []}
+    out: list[str] = []
+    for key in sorted(set(prev) | set(cur)):
+        if key in COLLECTIONS:
+            continue
+        a, b = prev.get(key), cur.get(key)
+        if a != b and not isinstance(a, (list, dict)) and not isinstance(b, (list, dict)):
+            sec, lab = labels.get(key, ("", key))
+            out.append(f"{sec + ' ' if sec else ''}{lab}({key}): {_show(a)} → {_show(b)}")
+    for key, (label, item, first) in COLLECTIONS.items():
+        a, b = prev.get(key) or [], cur.get(key) or []
+        if len(a) != len(b):
+            verb = "늘었어요" if len(b) > len(a) else "줄었어요(삭제됨)"
+            out.append(f"{label}: {len(a)}개 → {len(b)}개로 {verb}. 번호는 아래 '현재 셋업'의 목록을 따르세요")
+        fields = {f["key"]: f.get("label") or f["key"] for f in ((collections or {}).get(key) or {}).get("fields") or []}
+        for i, (ea, eb) in enumerate(zip(a, b)):
+            diff = [f"{fields.get(k, k)}({k}) {_show(ea.get(k))} → {_show(eb.get(k))}" for k in eb if ea.get(k) != eb.get(k)]
+            if diff:
+                out.append(f"{item} {i + first}: " + ", ".join(diff))
+    if len(out) > MAX_CHANGES:
+        out = out[:MAX_CHANGES] + [f"그 밖에 {len(out) - MAX_CHANGES}건"]
+    return out

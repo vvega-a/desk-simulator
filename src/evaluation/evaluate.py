@@ -224,6 +224,25 @@ def synth_result(patch: dict) -> dict:
     return {"applied": dict(patch.get("changes") or {}), "rejected": {}, "ops": ops}
 
 
+def synth_state(state: dict, patch: dict) -> dict:
+    """승인 뒤 브라우저가 돌려줄 '적용 뒤 상태'를 대략 합성한다. 단일 설정은 바꾸고, 물건은 추가·수정·삭제한다(위치 자동 배치는 흉내 내지 않는다).
+
+    적용 전 상태를 그대로 넘기면 '적용 뒤 현재 번호'에 새 물건이 없어서, 모델이 적용이 안 됐다고 보고 다시 제안한다(실제 화면에서는 생기지 않는 일).
+    """
+    after = copy.deepcopy(state)
+    after.update(patch.get("changes") or {})
+    for op in patch.get("array_ops") or []:
+        items = after.setdefault(op["collection"], [])
+        i = op.get("index")
+        if op["op"] == "add":
+            items.append(dict(op.get("values") or {}))
+        elif op["op"] == "update" and isinstance(i, int) and 0 <= i < len(items):
+            items[i].update(op.get("values") or {})
+        elif op["op"] == "remove" and isinstance(i, int) and 0 <= i < len(items):
+            items.pop(i)
+    return after
+
+
 INFRA_MARKERS = ("Throttling", "ServiceUnavailable", "serviceUnavailable", "ModelTimeout", "ReadTimeout", "ConnectTimeout",
                  "EndpointConnectionError", "InternalServer", "Too many requests", "TooManyRequests")
 RETRY_WAITS = (6, 15, 30)  # 인프라 오류가 나면 이만큼 쉬었다가 다시 시도한다(초)
@@ -258,7 +277,8 @@ def _run_once(graph, fixture: dict, case: dict, judge_llm) -> dict:
         if case.get("resume") and first["approval"]:
             approve = case["resume"] == "approve"
             result = synth_result(first["approval"]["patch"]) if approve else {}
-            final = summarize(list(agent.resume_stream(graph, thread, approve, result, fixture["checks"], state)))
+            after = synth_state(state, first["approval"]["patch"]) if approve else state
+            final = summarize(list(agent.resume_stream(graph, thread, approve, result, fixture["checks"], after)))
         judge = None
         if case["expect"].get("judge") and first["answer"] is not None:
             judge = judge_out_of_scope(judge_llm, case["question"], first["answer"])

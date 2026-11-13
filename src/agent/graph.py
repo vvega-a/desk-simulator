@@ -40,7 +40,7 @@ from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
 from src.agent import memory
-from src.agent.context import describe, describe_checks, describe_collections
+from src.agent.context import describe, describe_changes, describe_checks, describe_collections
 from src.agent.settings import (
     BAD_VALUE_PREFIX, VIEW_NAMES, diff_items, format_settings, validate_ops, validate_patch, validate_scene_action,
 )
@@ -62,6 +62,8 @@ SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 �
 
 규칙:
 - 아래 '현재 셋업' 글과 도구 결과에 적힌 값만 근거로 말해. 없는 수치는 지어내지 말고 모른다고 해.
+- '현재 셋업'은 이번 질문을 받은 때의 화면이야. 사용자는 대화 사이에 화면에서 직접 물건을 옮기거나 지우거나 값을 바꿀 수 있어. 지난 질문들의 대화·도구 결과(예: 예전의 '적용 뒤 현재 번호')에 나온 물건·번호·값이 '현재 셋업'과 다르면 '현재 셋업'을 따라. 단, 이번 질문에서 네가 도구로 적용한 결과('적용했어요', '적용 뒤 현재 번호')는 '현재 셋업'보다 최신이니 그것을 따라. 질문 앞에 '[화면에서 직접 바꾼 것]'이 있으면 그 변화를 알고 있는 것처럼 반영해.
+- 위치 값의 방향: x·monX·좌우 이동은 +가 오른쪽(사용자가 앉아서 볼 때), z·앞뒤 이동은 +가 앞쪽(사용자 쪽), back·monBack(책상 뒤 끝 → 화면)은 클수록 사용자 쪽이야. 서랍장의 x·z는 where(기본 위치)에서 옮긴 양이야.
 - 권장 기준·이유·요령을 물으면 search_guides로 가이드 문서를 찾아 근거로 답하고, 쓴 문서 제목을 짧게 밝혀(예: '가이드 「모니터 높이와 각도」에 따르면'). 문서와 점검 결과에 없는 기준은 지어내지 마. 현재 셋업의 수치는 점검 결과를 근거로 말해.
 - 점검 결과의 '문제'·'주의' 항목을 먼저 짚고, 어떻게 바꾸면 좋을지 구체적인 값(mm 등)으로 제안해.
 - 설정을 바꾸기 전에 list_settings로 정확한 키와 허용값을 확인해. 물건을 추가·수정할 때는 해당 물건 이름(예: 서랍장)을 section으로 조회해.
@@ -142,6 +144,7 @@ class AgentState(TypedDict, total=False):
     question: str
     history: list[dict]
     desk_state: dict
+    prev_state: dict  # 지난 답변을 마친 때의 상태(브라우저가 보냄). 지금 상태와 비교해 사용자가 직접 바꾼 것을 알린다
     checks: list[dict]
     settings_schema: list[dict]
     collections: dict
@@ -373,12 +376,17 @@ def build_graph(llm, checkpointer=None, retriever=None, summarizer="default"):
         summary = _summarize(summarizer, older)
         system = SYSTEM_PROMPT.format(context=text) + (SUMMARY_HEADER + summary if summary else "")
         question = guard.redact(raw_q)  # 입력 가드: 개인정보는 LLM에 보내기 전에 가린다
+        changes = describe_changes(state.get("prev_state"), state.get("desk_state") or {}, state.get("settings_schema"), state.get("collections"))
+        if changes:  # 질문 바로 앞에 둬야 앞선 대화보다 무게가 실린다
+            question = "[화면에서 직접 바꾼 것(지난 답변 이후, 이미 적용됨)]\n- " + "\n- ".join(changes) + "\n\n[질문]\n" + question
         messages = [SystemMessage(system)] + _history_messages(recent) + [HumanMessage(question)]
         notes = [f"점검 항목 {len(state.get('checks') or [])}개를 읽었어요"]
         if summary:
             notes.append(f"앞선 대화 {len(older)}개를 요약했어요")
-        if question != raw_q:
+        if guard.redact(raw_q) != raw_q:
             notes.append("질문 속 개인정보를 가리고 보냈어요")
+        if changes:
+            notes.append(f"화면에서 직접 바꾼 것 {len(changes)}건을 반영했어요")
         _step_done("context", " · ".join(notes))
         return {"context": text, "messages": messages, "loops": 0, "answer": "", "declined": False, "blocked": False}
 
@@ -491,10 +499,10 @@ def _run(graph, payload, thread_id: str):
 
 
 def ask_stream(graph, question: str, history: list[dict], desk_state: dict, checks: list[dict], settings_schema: list[dict],
-               collections: dict | None = None, slots: dict | None = None, thread_id: str | None = None):
+               collections: dict | None = None, slots: dict | None = None, thread_id: str | None = None, prev_state: dict | None = None):
     """진행 이벤트(step·token·client_action)를 차례로 내보낸다. 끝은 {"type": "result", "answer"} 또는 승인 대기 {"type": "approval", ...}."""
     payload = {"question": question, "history": history, "desk_state": desk_state, "checks": checks, "settings_schema": settings_schema,
-               "collections": collections or {}, "slots": slots or {}}
+               "collections": collections or {}, "slots": slots or {}, "prev_state": prev_state or {}}
     yield from _run(graph, payload, thread_id or uuid.uuid4().hex)
 
 

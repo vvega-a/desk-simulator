@@ -272,7 +272,7 @@ const WALL_COLORS=[{v:'#f4f2ee',l:'화이트'},{v:'#e6e0d8',l:'웜그레이'},{v
 const FLOOR_COLORS=[{v:'#d9b98f',l:'밝은 원목'},{v:'#c39a6b',l:'내추럴 원목'},{v:'#6e4e37',l:'어두운 원목'},{v:'#bdb9b2',l:'그레이'},{v:'#ecebe7',l:'화이트 타일'}];
 const WHERE=[{v:'underL',l:'책상 밑 왼쪽'},{v:'underR',l:'책상 밑 오른쪽'},{v:'sideL',l:'책상 왼쪽 옆'},{v:'sideR',l:'책상 오른쪽 옆'},{v:'Lleft',l:'왼쪽 ㄱ자'},{v:'Lright',l:'오른쪽 ㄱ자'},{v:'FLright',l:'앞쪽 오른쪽 ㄱ자'},{v:'FLleft',l:'앞쪽 왼쪽 ㄱ자'}];
 const DPRESET={mobile:{l:'이동식 3단',w:400,d:500,h:600,tiers:3,casters:true},desk:{l:'책상 높이',w:400,d:600,h:0,tiers:3,casters:false},wide:{l:'와이드 4단',w:800,d:450,h:900,tiers:4,casters:false}};
-const DF=[{k:'w',t:'가로 (폭)',min:250,max:1200,step:10},{k:'d',t:'깊이',min:250,max:800,step:10},{k:'h',t:'높이',min:250,max:1400,step:10},{k:'x',t:'좌우 이동',min:-1500,max:1500,step:10},{k:'z',t:'앞뒤 이동',min:-1000,max:1000,step:10}];
+const DF=[{k:'w',t:'가로 (폭)',min:250,max:1200,step:10},{k:'d',t:'깊이',min:250,max:800,step:10},{k:'h',t:'높이',min:250,max:1400,step:10},{k:'x',t:'좌우 이동 (+ 오른쪽)',min:-1500,max:1500,step:10},{k:'z',t:'앞뒤 이동 (+ 앞쪽·사용자 쪽)',min:-1000,max:1000,step:10}];
 const PLACES=[{v:'right',l:'오른쪽 옆'},{v:'left',l:'왼쪽 옆'},{v:'rightL',l:'오른쪽 ㄱ자'},{v:'leftL',l:'왼쪽 ㄱ자'},{v:'frontR',l:'앞쪽 오른쪽 ㄱ자'},{v:'frontL',l:'앞쪽 왼쪽 ㄱ자'},{v:'back',l:'뒤쪽'}];
 const XF=[{k:'w',t:'가로 (폭)',min:400,max:2400,step:10},{k:'d',t:'세로 (깊이)',min:300,max:1000,step:10},{k:'h',t:'높이',min:600,max:1250,step:5},{k:'gap',t:'책상 1과 간격',min:0,max:1500,step:10},{k:'shift',t:'앞뒤 이동',min:-1500,max:1500,step:10}];
 let S={...DEFAULTS,extraDesks:[],drawers:[],sets:[],pegs:[],monitors:[]};
@@ -1475,6 +1475,7 @@ const $=s=>document.querySelector(s);
 const app=document.querySelector('.app'),msgs=$('#msgs'),input=$('#chatInput'),sendBtn=$('#chatSend'),toggle=$('#chatToggle');
 const STARTERS=['지금 내 셋업 괜찮아?','서랍장 하나 추가해줘','정면에서 보여줘'];
 const history=[];let busy=false;
+let lastState=null; // 지난 답변을 마친 때의 상태. 다음 질문에 같이 보내 그 사이 화면에서 직접 바꾼 것(옮기기·삭제 등)을 에이전트가 알게 한다
 
 function setOpen(open){app.classList.toggle('chat-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.textContent=open?'AI 채팅 닫기':'AI 채팅';
   setTimeout(()=>window.dispatchEvent(new Event('resize')),30);if(open)setTimeout(()=>input.focus(),50)}
@@ -1487,6 +1488,7 @@ function setBusy(b){busy=b;sendBtn.disabled=b;input.disabled=b;if(!b)input.focus
 let turn=null; // 지금 진행 중인 한 번의 질문: {q, text, failed}. 승인을 기다리며 요청이 둘로 나뉘어도 한 턴으로 기록한다
 function finishTurn(){
   if(turn&&!turn.failed&&turn.text)history.push({role:'user',content:turn.q},{role:'assistant',content:turn.text,tools:turn.tools||[]}); // 도구 호출 내역도 같이 남긴다
+  if(window.deskSim)lastState=deskSim.getState(); // 승인한 변경이 적용된 뒤라 에이전트 자신의 변경은 '직접 바꾼 것'에 들어가지 않는다
   turn=null;setBusy(false);
 }
 async function send(question){
@@ -1495,7 +1497,7 @@ async function send(question){
   $('#starters').hidden=true;
   add('msg user',question);input.value='';input.style.height='auto';setBusy(true);
   turn={q:question,text:'',failed:false};
-  const ap=await run('/api/chat/stream',{question,history:history.slice(-40),state:deskSim.getState(),checks:deskSim.getChecks(),settings_schema:deskSim.schema(),collections:deskSim.collections(),slots:deskSim.slots()});
+  const ap=await run('/api/chat/stream',{question,history:history.slice(-40),state:deskSim.getState(),prev_state:history.length?lastState:null,checks:deskSim.getChecks(),settings_schema:deskSim.schema(),collections:deskSim.collections(),slots:deskSim.slots()});
   ap?showApproval(ap):finishTurn();
 }
 function showApproval(ev){
