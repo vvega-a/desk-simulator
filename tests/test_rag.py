@@ -4,10 +4,10 @@ from pathlib import Path
 
 from langchain_core.runnables import RunnableLambda
 
-from src.agent import graph as agent
-from src.evaluation import evaluate as ev
-from src.evaluation import rag_eval
-from src.rag import retriever as rag
+from src import agent
+from src import evaluate as ev
+from src import rag_eval
+from src import retriever as rag
 from tests.test_agent import FakeLLM, call, run, text, tool_messages
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -278,7 +278,7 @@ const DEFAULTS={deskW:1400,deskD:700,deskH:720,deskColor:'#f3f0ea',frameColor:'#
   mon:'27',curved:false,mount:'stand',monBack:200,monLift:100,
   kb:'tkl',theme:'white',mouse:true,mat:'900x400',matColor:'#e9dfd2',
   laptop:'none',tower:'none',speakers:false,chair:false,userH:175,dims:true,extraDesks:[],drawers:[],
-  room:false,roomW:3000,roomD:3300,roomH:2300,roomX:0,roomGap:0,wallColor:'#f4f2ee',floorColor:'#d9b98f',win:true,winW:1500,winX:0,door:true,doorWall:'right',lapSide:'left',lapSize:'14',lapAngle:17,monX:0,armX:0,sets:[],pegs:[],monitors:[]};
+  room:false,roomW:3000,roomD:3300,roomH:2300,roomRot:0,roomX:0,roomGap:0,wallColor:'#f4f2ee',floorColor:'#d9b98f',win:true,winW:1500,winX:0,door:true,doorWall:'right',lapSide:'left',lapSize:'14',lapAngle:17,monX:0,armX:0,sets:[],pegs:[],monitors:[]};
 const PEG_COLORS=[{v:'#f2f1ed',l:'화이트'},{v:'#26272a',l:'블랙'},{v:'#9ea2a6',l:'그레이'},{v:'#c9a57c',l:'우드'},{v:'#bcd6cc',l:'민트'}];
 const PF=[{k:'w',t:'가로',min:300,max:2400,step:10},{k:'h',t:'세로',min:200,max:1400,step:10},{k:'lift',t:'책상 위로 띄우기',min:0,max:900,step:10},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10}];
 const SF=[{k:'yaw',t:'모니터 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)',min:-60,max:60,step:1,unit:'°'},{k:'lapAng',t:'노트북 안쪽으로 꺾는 각도',min:0,max:70,step:1,unit:'°'},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10},{k:'lift',t:'모니터 하단 높이',min:0,max:450,step:5},{k:'back',t:'화면 위치 (책상 뒤 끝 → 화면)',min:60,max:500,step:10}];
@@ -301,18 +301,19 @@ const UI=[
  ]},
  {sec:'방',items:[
   {k:'room',t:'방 보이기',type:'toggle'},
-  {k:'roomW',t:'방 가로',type:'range',min:1800,max:7000,step:50,unit:'mm',chips:[2400,2700,3000,3300,3600],when:()=>S.room},
-  {k:'roomD',t:'방 세로',type:'range',min:1800,max:7000,step:50,unit:'mm',chips:[2700,3000,3300,3600,4000],when:()=>S.room},
+  {k:'roomW',t:'방 가로 (창문 벽 길이)',type:'range',min:1800,max:7000,step:50,unit:'mm',chips:[2400,2700,3000,3300,3600],when:()=>S.room},
+  {k:'roomD',t:'방 세로 (창문 벽 ↔ 맞은편 벽)',type:'range',min:1800,max:7000,step:50,unit:'mm',chips:[2700,3000,3300,3600,4000],when:()=>S.room},
   {k:'roomH',t:'천장 높이',type:'range',min:2100,max:3200,step:10,unit:'mm',chips:[2300,2400,2600],when:()=>S.room},
+  {k:'roomRot',t:'방 돌리기 (앉았을 때 창문 방향)',type:'seg',opts:[{v:0,l:'창문 앞'},{v:90,l:'창문 왼쪽'},{v:270,l:'창문 오른쪽'},{v:180,l:'창문 뒤'}],when:()=>S.room},
   {k:'roomX',t:'책상 좌우 위치 (방 가운데 기준)',type:'range',min:-3000,max:3000,step:10,unit:'mm',when:()=>S.room},
-  {k:'roomGap',t:'뒤 벽과 책상 사이',type:'range',min:0,max:3000,step:10,unit:'mm',when:()=>S.room},
+  {k:'roomGap',t:'책상 뒤쪽 벽과 책상 사이',type:'range',min:0,max:3000,step:10,unit:'mm',when:()=>S.room},
   {k:'wallColor',t:'벽 색',type:'swatch',opts:WALL_COLORS,when:()=>S.room},
   {k:'floorColor',t:'바닥',type:'swatch',opts:FLOOR_COLORS,when:()=>S.room},
-  {k:'win',t:'창문 (뒤 벽)',type:'toggle',when:()=>S.room},
+  {k:'win',t:'창문',type:'toggle',when:()=>S.room},
   {k:'winW',t:'창문 폭',type:'range',min:500,max:3500,step:50,unit:'mm',when:()=>S.room&&S.win},
-  {k:'winX',t:'창문 좌우 위치 (방 가운데 기준)',type:'range',min:-3000,max:3000,step:10,unit:'mm',when:()=>S.room&&S.win},
+  {k:'winX',t:'창문 위치 (창문 벽 가운데 기준)',type:'range',min:-3000,max:3000,step:10,unit:'mm',when:()=>S.room&&S.win},
   {k:'door',t:'문',type:'toggle',when:()=>S.room},
-  {k:'doorWall',t:'문 위치',type:'seg',opts:[{v:'left',l:'왼쪽 벽'},{v:'right',l:'오른쪽 벽'},{v:'front',l:'앞쪽 벽'}],when:()=>S.room&&S.door},
+  {k:'doorWall',t:'문 위치 (창문 벽을 바라볼 때)',type:'seg',opts:[{v:'left',l:'왼쪽 벽'},{v:'right',l:'오른쪽 벽'},{v:'front',l:'창문 맞은편 벽'}],when:()=>S.room&&S.door},
  ]},
  {sec:'모니터 1',items:[
   {k:'mon',t:'모델',type:'select',opts:Object.entries(MONITORS).map(([v,m])=>({v,l:m.label}))},
@@ -365,7 +366,7 @@ const ITEM_DEFS=[
   {id:'tower',label:'PC 본체',keys:['tower'],on:()=>S.tower!=='none',add:()=>set('tower','deskR'),remove:()=>set('tower','none'),sum:()=>TOWER_NAME[S.tower]},
   {id:'speakers',label:'스피커',keys:[],note:'북쉘프 스피커는 모니터 양옆에 자동으로 놓여요. 색은 키보드·마우스 색을 따라가요.',on:()=>S.speakers,add:()=>set('speakers',true),remove:()=>set('speakers',false),sum:()=>'북쉘프 2개'},
   {id:'chair',label:'의자',keys:[],note:'책상 앞에 놓여요. 크기는 「내 키 · 표시」의 키에 맞춰 그려져요.',on:()=>S.chair,add:()=>set('chair',true),remove:()=>set('chair',false),sum:()=>`키 ${S.userH}cm 기준`},
-  {id:'room',label:'방',keys:['roomW','roomD','roomH','roomX','roomGap','wallColor','floorColor','win','winW','winX','door','doorWall'],on:()=>S.room,add:()=>set('room',true),remove:()=>set('room',false),sum:()=>`${S.roomW}×${S.roomD}`},
+  {id:'room',label:'방',keys:['roomW','roomD','roomH','roomRot','roomX','roomGap','wallColor','floorColor','win','winW','winX','door','doorWall'],on:()=>S.room,add:()=>set('room',true),remove:()=>set('room',false),sum:()=>`${S.roomW}×${S.roomD}${S.win?' · '+ROOM_ROT[roomRot()]:''}`},
 ];
 ARR.forEach(a=>{a.item=a.item||a.label}); // item = 화면에 보이는 이름(번호 앞). 번호는 i+first로 화면·채팅·카드가 모두 같다
 let sel='desk'; // 선택한 아이템: 단일 물건은 id, 배열 물건은 'drawers:0'처럼 키:번호
@@ -586,27 +587,38 @@ function wallPiece(g,len,H,T,mat,hole){
   }
 }
 let roomWalls=[];
+// 방 돌리기: 0 = 창문이 모니터 뒤(앞), 90 = 창문이 왼쪽, 270 = 창문이 오른쪽, 180 = 창문이 등 뒤. 방 가로·세로·창문·문은 방에 붙어서 같이 돈다
+const ROOM_ROT={0:'창문 앞',90:'창문 왼쪽',270:'창문 오른쪽',180:'창문 뒤'};
+function roomRot(){const r=((Math.round(Number(S.roomRot)||0)/90|0)*90%360+360)%360;return r}
 function buildRoom(g){
   roomWalls=[];
-  const {roomW:RW,roomD:RD,roomH:RH,roomX,roomGap,deskD:D}=S,T=100;
-  const xl=-RW/2-roomX,xr=RW/2-roomX,zb=-D/2-roomGap,zf=zb+RD,cx=(xl+xr)/2,cz=(zb+zf)/2;
+  const {roomW:RW,roomD:RD,roomH:RH,roomX,roomGap,deskD:D}=S,T=100,rot=roomRot(),turned=rot%180!==0;
+  // 책상 기준(좌우 x, 앞뒤 z)으로 본 방의 크기. 90°·270°면 가로·세로가 바뀐다
+  const Wd=turned?RD:RW,Dd=turned?RW:RD;
+  const xl=-Wd/2-roomX,xr=Wd/2-roomX,zb=-D/2-roomGap,zf=zb+Dd,cx=(xl+xr)/2,cz=(zb+zf)/2;
+  const rg=new THREE.Group();rg.position.set(cx,0,cz);rg.rotation.y=rot*Math.PI/180;g.add(rg);
   const fm0=floorMat(S.floorColor),tex=fm0.map.clone();tex.needsUpdate=true;tex.repeat.set(RW/1800,RD/1800);
   const fl=new THREE.Mesh(new THREE.PlaneGeometry(RW,RD),new THREE.MeshStandardMaterial({map:tex,roughness:.8}));fl.userData.disposeMat=true;
-  fl.rotation.x=-Math.PI/2;fl.position.set(cx,.5,cz);fl.receiveShadow=true;g.add(fl);
+  fl.rotation.x=-Math.PI/2;fl.position.set(0,.5,0);fl.receiveShadow=true;rg.add(fl);
   const wm=M(S.wallColor,{r:.95});
+  // 방 자체 좌표: 창문 벽(back)이 -z. 문 위치(left·right·front)는 창문 벽을 바라볼 때 기준이다
   const walls=[
-    {name:'back',len:RW+2*T,pos:V(cx,0,zb-T/2),rot:0,n:V(0,0,1),hole:S.win?{type:'win',x:S.winX,w:S.winW,y:900,h:Math.min(1300,RH-1000)}:null},
-    {name:'front',len:RW+2*T,pos:V(cx,0,zf+T/2),rot:Math.PI,n:V(0,0,-1),hole:S.door&&S.doorWall==='front'?{type:'door',x:-(RW/2-150-450),w:900,y:0,h:2050}:null},
-    {name:'left',len:RD,pos:V(xl-T/2,0,cz),rot:Math.PI/2,n:V(1,0,0),hole:S.door&&S.doorWall==='left'?{type:'door',x:RD/2-200-450,w:900,y:0,h:2050}:null},
-    {name:'right',len:RD,pos:V(xr+T/2,0,cz),rot:-Math.PI/2,n:V(-1,0,0),hole:S.door&&S.doorWall==='right'?{type:'door',x:-(RD/2-200-450),w:900,y:0,h:2050}:null},
+    {name:'back',len:RW+2*T,pos:V(0,0,-RD/2-T/2),rot:0,n:V(0,0,1),hole:S.win?{type:'win',x:S.winX,w:S.winW,y:900,h:Math.min(1300,RH-1000)}:null},
+    {name:'front',len:RW+2*T,pos:V(0,0,RD/2+T/2),rot:Math.PI,n:V(0,0,-1),hole:S.door&&S.doorWall==='front'?{type:'door',x:-(RW/2-150-450),w:900,y:0,h:2050}:null},
+    {name:'left',len:RD,pos:V(-RW/2-T/2,0,0),rot:Math.PI/2,n:V(1,0,0),hole:S.door&&S.doorWall==='left'?{type:'door',x:RD/2-200-450,w:900,y:0,h:2050}:null},
+    {name:'right',len:RD,pos:V(RW/2+T/2,0,0),rot:-Math.PI/2,n:V(-1,0,0),hole:S.door&&S.doorWall==='right'?{type:'door',x:-(RD/2-200-450),w:900,y:0,h:2050}:null},
   ];
+  rg.updateMatrixWorld(true);
+  const up=V(0,1,0),ang=rot*Math.PI/180;
   for(const w of walls){
     const wg=new THREE.Group();wallPiece(wg,w.len,RH,T,wm,w.hole);
-    wg.position.copy(w.pos);wg.rotation.y=w.rot;g.add(wg);
+    wg.position.copy(w.pos);wg.rotation.y=w.rot;rg.add(wg);
     wg.add(at(box(w.name==='back'||w.name==='front'?RW:RD,70,12,M('#ffffff',{r:.6})),0,35,T/2+6));
-    roomWalls.push({g:wg,p:w.pos.clone().add(w.n.clone().multiplyScalar(T/2)),n:w.n});
+    // 카메라 쪽 벽을 숨기는 판정은 월드 좌표로 한다(방이 돌아가 있으므로 위치·방향을 같이 돌린다)
+    const p=rg.localToWorld(w.pos.clone().add(w.n.clone().multiplyScalar(T/2))),n=w.n.clone().applyAxisAngle(up,ang);
+    roomWalls.push({g:wg,p,n});
   }
-  return {xl,xr,zb,zf,cx,cz};
+  return {xl,xr,zb,zf,cx,cz,W:Wd,D:Dd,rot};
 }
 function renderSets(){
   const box=$('#sets'),L=S.sets;
@@ -836,7 +848,7 @@ function set(k,v){
   v=cast(k,v); if(S[k]===v)return; S[k]=v;
   if(k==='mon')S.curved=!!MONITORS[v].R;
   if(k==='mount')S.monBack=v==='stand'?200:120;
-  if(k==='room'||k==='roomW'||k==='roomD')setTimeout(()=>{if(curView!=='pov')setView(curView)},60);
+  if(k==='room'||k==='roomW'||k==='roomD'||k==='roomRot')setTimeout(()=>{if(curView!=='pov')setView(curView)},60);
   refreshUI();schedule();
 }
 
@@ -1211,7 +1223,7 @@ function build(){
     for(const {xg,e} of xGroups){const dg=new THREE.Group();dg.position.copy(xg.position);dg.rotation.copy(xg.rotation);dims.add(dg);
       dimLine(dg,V(-e.w/2,e.h+2,e.d/2+80),V(e.w/2,e.h+2,e.d/2+80),`${e.w}`);dimLine(dg,V(-e.w/2-80,e.h+2,-e.d/2),V(-e.w/2-80,e.h+2,e.d/2),`${e.d}`);}
     for(const {dg,e} of dGroups){const s=labelSprite(`${e.w}×${e.d}×${e.h}`);s.position.set(dg.position.x,e.h+(e.where.startsWith('under')?-60:70),dg.position.z+(/^F?L/.test(e.where)?0:e.d/2));dims.add(s)}
-    if(room){dimLine(dims,V(room.xl,8,room.zf-60),V(room.xr,8,room.zf-60),`방 ${S.roomW}`);dimLine(dims,V(room.xl+60,8,room.zb),V(room.xl+60,8,room.zf),`${S.roomD}`)}
+    if(room){dimLine(dims,V(room.xl,8,room.zf-60),V(room.xr,8,room.zf-60),`방 ${room.W}`);dimLine(dims,V(room.xl+60,8,room.zb),V(room.xl+60,8,room.zf),`${room.D}`)}
     dimLine(dims,V(-W/2+70,H+4,mainZ),V(-W/2+70,H+4,D/2+EYE),`눈까지 ${Math.round(D/2+EYE-mainZ)}`,true);
   }
 
@@ -1260,6 +1272,10 @@ function renderChecks(){
     const rm=info.room,b=info.allBox,out1=b.min.x<rm.xl-1||b.max.x>rm.xr+1||b.min.z<rm.zb-1||b.max.z>rm.zf+1;
     const aisle=Math.round(rm.zf-D/2);
     if(out1)out.push({t:'방',v:'방 밖으로 나가요',s:'bad',n:'책상 위치나 방 크기를 조정해 보세요'});
+    if(S.win){ // 창문이 화면 뒤면 눈부심, 등 뒤면 화면 반사. 옆이 좋다(가이드 「공간과 배치 > 방과 창문 방향」)
+      const r=rm.rot,dir={0:'모니터 뒤',90:'왼쪽',270:'오른쪽',180:'등 뒤'}[r];
+      out.push({t:'창문 방향',v:dir,s:r%180?'ok':'warn',n:r===0?'창밖이 밝으면 화면이 어둡게 보이고 눈이 부셔요. 「방 돌리기」로 창문을 옆에 두면 좋아요':r===180?'창빛이 화면에 비쳐 반사가 생기기 쉬워요. 「방 돌리기」로 창문을 옆에 두면 좋아요':'창문이 옆이라 눈부심과 화면 반사가 적어요'});
+    }
     out.push({t:'책상 앞 공간 (의자·통로)',v:`${aisle} mm`,s:aisle<750?'bad':aisle<1000?'warn':'ok',n:aisle<750?'의자를 빼기 어려워요':aisle<1000?'의자는 되지만 지나가기 빠듯해요':'의자 뒤로 지나다닐 수 있어요'});
   }
   if(S.drawers.length){
@@ -1561,10 +1577,17 @@ function showProducts(ev){
     const n=document.createElement('p');n.className='note';n.textContent='치수 표시는 상품명 기준이에요. 판매 페이지에서 실제 치수를 확인해 주세요.';box.appendChild(n);
   }else{
     const n=document.createElement('p');n.className='note';
-    n.textContent=ev.error?'상품 목록을 가져오지 못했어요. 아래 링크에서 같은 검색어로 찾아보세요.':ev.mode==='link'?'쇼핑 API 키가 없어 목록 대신 검색 링크를 드려요(.env의 NAVER_CLIENT_ID·SECRET).':'맞는 상품을 찾지 못했어요.';
+    n.textContent=ev.error?'상품 목록을 가져오지 못했어요.':ev.mode==='link'?'쇼핑 API 키가 없어 채팅에 상품 목록은 못 보여 드려요(.env의 NAVER_CLIENT_ID·SECRET을 넣으면 보여요).':'맞는 상품을 찾지 못했어요.';
     box.appendChild(n);
   }
   if(safe(ev.url))box.appendChild(link(ev.url,'네이버 쇼핑에서 더 보기 →','more'));
+  if(ev.open&&safe(ev.url)){ // 상품 목록이 없으면 검색 결과를 바로 새 탭으로 연다. 답이 늦게 오면 브라우저가 팝업으로 막을 수 있다
+    let w=null;try{w=window.open(ev.url,'_blank')}catch(e){}
+    const n=document.createElement('p');n.className='note';
+    if(w){try{w.opener=null}catch(e){}n.textContent='네이버 쇼핑 검색 결과를 새 탭으로 열었어요.'}
+    else n.textContent='브라우저가 새 탭을 막았어요. 위 링크를 눌러 열어 주세요. (주소창 오른쪽의 팝업 차단 아이콘에서 이 사이트를 허용하면 다음부터 바로 열려요)';
+    box.appendChild(n);
+  }
   msgs.appendChild(box);msgs.scrollTop=msgs.scrollHeight;
 }
 async function run(url,body){

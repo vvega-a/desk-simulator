@@ -1,13 +1,13 @@
-"""평가 러너의 채점 로직과 평가 파일(test_queries.json·fixture.json)의 정합성 테스트(Bedrock 없이)."""
+"""평가 러너의 채점 로직과 평가 파일(test_queries.csv·fixture.json)의 정합성 테스트(Bedrock 없이)."""
 import json
 from pathlib import Path
 
-from src.agent.graph import NOT_APPLIED_NOTICE
-from src.evaluation import evaluate as ev
+from src.agent import NOT_APPLIED_NOTICE
+from src import evaluate as ev
 
 EVAL_DIR = Path(__file__).resolve().parents[1] / "evaluation"
 FIXTURE = json.loads((EVAL_DIR / "fixture.json").read_text(encoding="utf-8"))
-CASES = json.loads((EVAL_DIR / "test_queries.json").read_text(encoding="utf-8"))["cases"]
+CASES = ev.load_cases()
 
 
 def phase(approval=None, actions=(), answer="네.", tools=(), error=None):

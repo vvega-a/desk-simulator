@@ -1,6 +1,6 @@
 """가이드 문서 검색 평가: evaluation/rag_queries.json의 질의로 검색기 구성별 hit@1·hit@3·MRR을 잰다.
 
-실행:  python -m src.evaluation.rag_eval
+실행:  python -m src.rag_eval
 결과:  evaluation/reports/rag_latest.json, rag_latest.md
 
 비교하는 구성
@@ -15,9 +15,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from src.rag.retriever import HybridRetriever, build_retriever
+from src.retriever import HybridRetriever, build_retriever
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = ROOT / "evaluation"
 CONFIGS = {
     "bm25": {"use_bm25": True, "use_vector": False, "expand": False},
@@ -57,7 +57,7 @@ def render(meta: dict, results: dict, k: int) -> str:
 
 
 def main():
-    from src.core.config import bedrock_client_config, load_settings
+    from src.config import bedrock_client_config, load_settings
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--k", type=int, default=3)

@@ -21,4 +21,4 @@ tests/
 evaluation/
 docs/
 *.md
-!knowledge/*.md
+!data/*.md

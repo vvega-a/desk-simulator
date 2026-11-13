@@ -1,5 +1,5 @@
 """대화 이력 미들웨어: 길어진 대화의 오래된 부분은 요약하고, 최근 대화는 원문(도구 호출 내역 포함)으로 넘긴다.
-고양이 챗봇(pjt)의 src/rag/history.py를 옮겼다.
+고양이 챗봇(pjt)의 src/history.py를 옮겼다.
 
 예전에는 최근 10개 메시지만 넘기고 나머지를 버렸다. 이제 브라우저가 최근 40개까지 보내고,
   - 최근 KEEP(10)개는 항상 원문으로 남긴다(도구 호출 내역도 되살린다 — graph._history_messages).
@@ -12,7 +12,7 @@ import hashlib
 import threading
 from collections import OrderedDict
 
-from src.core import guard
+from src import guard
 
 KEEP = 10
 BLOCK = 4

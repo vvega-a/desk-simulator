@@ -1,16 +1,16 @@
 {
  "meta": {
-  "when": "2026-11-13 10:50",
+  "when": "2026-11-13 11:49",
   "embed_model": "amazon.titan-embed-text-v2:0",
-  "queries": 20,
-  "chunks": 26,
+  "queries": 21,
+  "chunks": 27,
   "vector_error": null
  },
  "results": {
   "bm25": {
-   "hit@1": 0.6,
-   "hit@3": 0.9,
-   "mrr": 0.75,
+   "hit@1": 0.6190476190476191,
+   "hit@3": 0.9047619047619048,
+   "mrr": 0.753968253968254,
    "rows": [
     {
      "id": "q_dist_formula",
@@ -54,7 +54,7 @@
      "top": [
       "desk-chair-height#2",
       "desk-chair-height#4",
-      "monitor-height#3"
+      "space-layout#6"
      ]
     },
     {
@@ -122,11 +122,11 @@
     },
     {
      "id": "q_chair",
-     "rank": 2,
+     "rank": 3,
      "top": [
       "viewing-distance#4",
-      "desk-chair-height#4",
-      "keyboard-mouse#1"
+      "space-layout#6",
+      "desk-chair-height#4"
      ]
     },
     {
@@ -188,13 +188,22 @@
       "monitor-choice#1",
       "viewing-distance#3"
      ]
+    },
+    {
+     "id": "q_window",
+     "rank": 1,
+     "top": [
+      "space-layout#6",
+      "viewing-distance#4",
+      "monitor-height#1"
+     ]
     }
    ]
   },
   "bm25+exp": {
-   "hit@1": 0.9,
+   "hit@1": 0.8571428571428571,
    "hit@3": 1.0,
-   "mrr": 0.9416666666666667,
+   "mrr": 0.9206349206349206,
    "rows": [
     {
      "id": "q_dist_formula",
@@ -342,10 +351,10 @@
     },
     {
      "id": "q_aisle",
-     "rank": 1,
+     "rank": 2,
      "top": [
-      "space-layout#2",
       "desk-chair-height#3",
+      "space-layout#2",
       "desk-chair-height#4"
      ]
     },
@@ -375,13 +384,22 @@
       "monitor-choice#1",
       "viewing-distance#3"
      ]
+    },
+    {
+     "id": "q_window",
+     "rank": 1,
+     "top": [
+      "space-layout#6",
+      "viewing-distance#4",
+      "monitor-height#1"
+     ]
     }
    ]
   },
   "vector": {
-   "hit@1": 0.8,
-   "hit@3": 0.9,
-   "mrr": 0.85,
+   "hit@1": 0.8095238095238095,
+   "hit@3": 0.9047619047619048,
+   "mrr": 0.8571428571428571,
    "rows": [
     {
      "id": "q_dist_formula",
@@ -515,7 +533,7 @@
      "top": [
       "keyboard-mouse#2",
       "monitor-choice#2",
-      "space-layout#5"
+      "space-layout#6"
      ]
     },
     {
@@ -561,6 +579,15 @@
       "monitor-choice#2",
       "viewing-distance#3",
       "monitor-choice#1"
+     ]
+    },
+    {
+     "id": "q_window",
+     "rank": 1,
+     "top": [
+      "space-layout#6",
+      "monitor-choice#3",
+      "viewing-distance#2"
      ]
     }
    ]
@@ -639,7 +666,7 @@
      "top": [
       "monitor-height#2",
       "viewing-distance#2",
-      "desk-chair-height#1"
+      "monitor-choice#3"
      ]
     },
     {
@@ -748,6 +775,15 @@
       "monitor-choice#2",
       "monitor-choice#1",
       "viewing-distance#3"
+     ]
+    },
+    {
+     "id": "q_window",
+     "rank": 1,
+     "top": [
+      "space-layout#6",
+      "monitor-choice#3",
+      "monitor-height#1"
      ]
     }
    ]

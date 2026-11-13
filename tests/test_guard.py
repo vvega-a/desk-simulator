@@ -3,9 +3,9 @@ import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableLambda
 
-from src.agent import graph as agent
-from src.agent import memory
-from src.core import guard
+from src import agent
+from src import memory
+from src import guard
 from tests.test_agent import CHECKS, SCHEMA, STATE, FakeLLM, text
 
 

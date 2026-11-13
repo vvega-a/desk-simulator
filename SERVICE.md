@@ -7,7 +7,7 @@
 - **누구를 위한 서비스인가**
   - 겨냥하는 사용자 **(가정)**: 재택근무를 시작하며 책상(예: 1400×700)과 모니터(예: 27~34인치)를 새로 사거나 재배치하려는 직장인·개발자. 구매 전에 "내 책상에 이 모니터가 들어가나, 눈은 편한가"를 확인하고 싶은 사람.
   - **현재 실제 사용자**: 개발자 본인 1명(AI 에이전트 실습용 프로젝트). 외부 사용자 조사는 하지 않았다.
-- **어떤 문제를 푸는가 (한 문장)**: 책상 셋업이 몸과 공간에 맞는지 눈으로 확인하고 싶지만 조절 항목이 수십 개(단일 설정 39개 + 모니터·서랍장 등 5종 물건)라서 일일이 만지기 번거롭다.
+- **어떤 문제를 푸는가 (한 문장)**: 책상 셋업이 몸과 공간에 맞는지 눈으로 확인하고 싶지만 조절 항목이 수십 개(단일 설정 40개 + 모니터·서랍장 등 5종 물건)라서 일일이 만지기 번거롭다.
 - **이 에이전트가 없을 때는 어떻게 해결하나**
   - 줄자와 종이 스케치, 쇼핑몰 스펙표 비교, 또는 시뮬레이터의 슬라이더·버튼을 하나씩 조작한다. 모니터 크기에 맞는 시청 거리나 책상 밑에 서랍장이 들어가는지는 직접 계산해야 한다.
 - **이걸로 뭐가 좋아지는가**
@@ -37,8 +37,8 @@
 |---|---|---|---|
 | `list_settings` | 설정·물건의 키·범위·선택지 조회 | 서버 내부(스키마 글 반환) | 불필요(읽기) |
 | `search_products` | 지금 물건(책상·모니터·서랍장 …)과 치수가 맞는 상품을 네이버 쇼핑에서 검색 | 네이버 검색 API(쇼핑). 키가 없으면 검색 링크만. 결과는 채팅의 상품 카드 | 불필요(읽기, 구매·주문은 하지 않음) |
-| `search_guides` | 권장 기준·이유·요령을 가이드 문서에서 검색(RAG: 쿼리 확장 + BM25 + 벡터, RRF) | 서버 내부(`src/rag/retriever.py`, 출처 제목을 붙인 글 반환) | 불필요(읽기) |
-| `propose_changes` | 단일 설정 변경(39개), 물건 추가·수정·삭제(모니터 2~4·추가 책상·서랍장·모니터+노트북 세트·타공판) | 서버가 검증 → 승인 카드 → 브라우저 `deskSim.applyChanges` | **필요** |
+| `search_guides` | 권장 기준·이유·요령을 가이드 문서에서 검색(RAG: 쿼리 확장 + BM25 + 벡터, RRF) | 서버 내부(`src/retriever.py`, 출처 제목을 붙인 글 반환) | 불필요(읽기) |
+| `propose_changes` | 단일 설정 변경(40개), 물건 추가·수정·삭제(모니터 2~4·추가 책상·서랍장·모니터+노트북 세트·타공판) | 서버가 검증 → 승인 카드 → 브라우저 `deskSim.applyChanges` | **필요** |
 | `scene_action` | 모든 설정 초기화, 슬롯 A/B/C 저장·불러오기 | 승인 카드 → `deskSim.applyChanges`(scene_action) | **필요** |
 | `set_view` | 시점 5종(사선·정면·위에서·옆·앉은 시점), 자동 회전 | SSE `client_action` → `deskSim.view`·`autoRotate` | 불필요(되돌리기 쉬움) |
 
@@ -49,7 +49,7 @@
 |---|---|---|
 | 모니터 10종 규격(24"·27"·32"·42" OLED, 34"·38"·40"·45" 울트라와이드, 49"·57" 슈퍼울트라와이드 — 대각선·비율·곡률) | `index.html`의 `MONITORS` | 대표 규격을 코드에 적은 값. 특정 제품 데이터가 아님 |
 | 인체공학 점검 규칙 | `renderChecks`(좌우 여유 60mm 미만 주의, 권장 시청 거리 = 화면 세로 길이의 2.0~2.6배, 화면 위쪽이 눈높이 +30mm ~ −180mm, 앉아서 쓰는 책상 높이 ≈ 키×0.41, 통로 750mm 미만 문제·1000mm 미만 주의, 책상 밑 다리 공간 550mm 미만 문제 등) | 시뮬레이터에 내장된 **경험 규칙**. 공인 기준을 인용하거나 검증한 것이 아님 |
-| 가이드 문서 6개(시청 거리, 모니터 높이, 책상·의자 높이, 키보드·마우스, 공간 배치, 모니터 고르기 — 26개 조각) | `knowledge/*.md` | 직접 쓴 문서. 수치는 점검 규칙과 같은 값('시뮬레이터 규칙')이거나 흔히 알려진 요령('일반 권장')으로 표시. 공인 기준·의학적 근거가 아님 |
+| 가이드 문서 6개(시청 거리, 모니터 높이, 책상·의자 높이, 키보드·마우스, 공간 배치, 모니터 고르기 — 26개 조각) | `data/*.md` | 직접 쓴 문서. 수치는 점검 규칙과 같은 값('시뮬레이터 규칙')이거나 흔히 알려진 요령('일반 권장')으로 표시. 공인 기준·의학적 근거가 아님 |
 | 현재 셋업(치수·물건·위치) | 브라우저의 시뮬레이터 상태 `S`. 질문마다 서버로 전달하고 서버는 보관하지 않음 | 사용자가 만든 가상의 배치 |
 | 저장 슬롯 A/B/C | 브라우저 `localStorage` | 사용자 데이터. 이 브라우저에만 저장 |
 | LLM | AWS Bedrock, Claude Haiku 4.5 | 외부 서비스 |
@@ -60,7 +60,7 @@
 ## 4. 서비스 정책 (가드레일 요약)
 어떤 경우에도 지켜야 할 규칙은 6가지다. 세부 케이스는 두 곳에서 검증한다.
 ① **자동 테스트 156개**(`tests/`, 가짜 LLM·가짜 임베딩) — 규칙이 *코드에서* 지켜지는지.
-② **평가 세트 [`evaluation/test_queries.json`](evaluation/test_queries.json)의 guardrail(`gr_*`)·범위 밖(`out_*`) 항목** — 실제 Bedrock 모델이 *실제로* 지키는지(35건 × 3회, 결과는 [README](README.md)와 `evaluation/reports/latest.md`).
+② **평가 세트 [`evaluation/test_queries.csv`](evaluation/test_queries.csv)의 guardrail(`gr_*`)·범위 밖(`out_*`) 항목** — 실제 Bedrock 모델이 *실제로* 지키는지(35건 × 3회, 결과는 [README](README.md)와 `evaluation/round2_report.md`).
 
 | # | 규칙 | 어떻게 지키나 | 검증 (자동 테스트 · 평가 케이스) |
 |---|---|---|---|
@@ -69,7 +69,7 @@
 | 3 | **실제로 적용된 게 없으면 했다고 말하지 않는다.** | 도구 결과에 "적용했어요"가 있어야 완료로 본다. 대화 기록에 도구 호출 내역을 남겨 모방을 막고, 그래도 도구 없이 완료를 주장하면 "이번 요청에서는 실제로 적용된 것이 없어요"를 덧붙인다 | `test_claiming_done_without_any_applied_tool_gets_a_truthful_notice`, `test_read_only_tool_then_done_claim_still_gets_notice`, `test_history_restores_tool_calls_so_model_does_not_just_claim_done`, `test_no_notice_when_something_was_really_applied` · 평가: 모든 실행에 공통 불변식으로 검사(99번 중 위반 0건) |
 | 4 | **내부 정보와 오류 상세를 노출하지 않는다.** 요청 크기를 제한한다 | 오류는 종류만 알리고(키·권한 정보 숨김), `.env`는 `.gitignore`로 저장소에 올리지 않는다. 질문 1000자, 대화 기록 40개·항목당 4000자, 도구 기록 8개 등 상한을 둔다. 에이전트 루프는 최대 6회, 한 턴에 승인 제안은 도구당 1번 | `test_error_hides_details`, `test_approve_unknown_thread_reports_error_without_details`, `test_request_validation`, `test_history_tools_are_validated_by_the_api`, `test_loop_is_capped`, `test_one_approval_per_tool_per_turn` · 평가: 서버 오류·예외 0건(99번) |
 | 5 | **서버는 사용자의 셋업을 보관하지 않는다.** 상태의 원본은 브라우저 하나다 | 질문마다 현재 상태를 보내고 서버는 저장하지 않는다. 대화도 서버에 저장하지 않는다(승인 대기 중인 요청만 서버 메모리에 임시 보관, 오래된 대화 요약은 서버 메모리에 최대 64개 캐시 — 마스킹된 글만) | 구조로 보장(별도 테스트 없음) |
-| 6 | **개인정보를 LLM에 보내지 않고, 지시를 바꾸려는 요청은 LLM에 보내지 않는다.** | 질문·이전 대화·요약의 전화번호·이메일·주민등록번호·카드번호·주소·본인 이름을 보내기 전에 가리고, 답변 조각·승인 카드 이유도 한 번 더 가린다. "이전 지시 무시", "시스템 프롬프트 알려줘" 같은 말투는 규칙으로 잡아 LLM 없이 고정 안내만 한다(`src/core/guard.py`) | `test_redact_masks_personal_data`, `test_redact_leaves_desk_requests_alone`, `test_injection_is_detected`, `test_normal_desk_requests_are_not_injection`, `test_injection_is_answered_without_calling_the_llm`, `test_question_pii_is_masked_before_the_llm_sees_it`, `test_llm_output_is_masked_in_tokens_and_answer` · 평가 `out_injection`(규칙 차단 3/3) |
+| 6 | **개인정보를 LLM에 보내지 않고, 지시를 바꾸려는 요청은 LLM에 보내지 않는다.** | 질문·이전 대화·요약의 전화번호·이메일·주민등록번호·카드번호·주소·본인 이름을 보내기 전에 가리고, 답변 조각·승인 카드 이유도 한 번 더 가린다. "이전 지시 무시", "시스템 프롬프트 알려줘" 같은 말투는 규칙으로 잡아 LLM 없이 고정 안내만 한다(`src/guard.py`) | `test_redact_masks_personal_data`, `test_redact_leaves_desk_requests_alone`, `test_injection_is_detected`, `test_normal_desk_requests_are_not_injection`, `test_injection_is_answered_without_calling_the_llm`, `test_question_pii_is_masked_before_the_llm_sees_it`, `test_llm_output_is_masked_in_tokens_and_answer` · 평가 `out_injection`(규칙 차단 3/3) |
 
 ### 아직 지키지 못하는 것 (정직한 공백)
 - **범위 밖 요청 사양**(셋업과 무관한 질문에 정중히 거절)은 프롬프트 규칙이고 코드 차단이 아니다. 평가 세트 5건(날씨, 파이썬 코드, 주가, 고양이 건강검진, 시스템 프롬프트 노출 요청. 8차부터 '최저가 쇼핑몰'은 상품 검색으로 범위 안이라 '주가'로 바꿈)을 3회씩 돌려 **15/15로 사양**했지만, 케이스가 5건뿐이고 판정 모델이 답변 모델과 같아 자기 평가 편향이 있을 수 있다.

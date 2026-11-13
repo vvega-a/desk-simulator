@@ -53,7 +53,9 @@ def describe(state: dict, checks: list[dict], slots: dict | None = None, collect
         lines.append(f"사용자 키: {s['userH']}cm")
     lines += describe_collections(s, collections)
     if s.get("room"):
-        lines.append(f"방: {s.get('roomW')}mm × {s.get('roomD')}mm, 천장 {s.get('roomH')}mm")
+        rot = {0: "창문이 앞(모니터 뒤)", 90: "창문이 왼쪽", 270: "창문이 오른쪽", 180: "창문이 뒤(등 뒤)"}.get(int(s.get("roomRot") or 0) % 360, "창문이 앞(모니터 뒤)")
+        window = f", 방 돌리기(roomRot) {s.get('roomRot') or 0}° = 앉았을 때 {rot}" if s.get("win", True) else ", 창문 없음"
+        lines.append(f"방: {s.get('roomW')}mm × {s.get('roomD')}mm(창문 벽 길이 × 깊이), 천장 {s.get('roomH')}mm{window}")
     if slots:
         lines.append("저장 슬롯: " + " / ".join(f"{k}: {v or '비어 있음'}" for k, v in slots.items()))
     if checks:

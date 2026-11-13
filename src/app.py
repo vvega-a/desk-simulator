@@ -1,4 +1,4 @@
-"""데스크 셋업 시뮬레이터 + AI 채팅 서버(FastAPI). 실행: uvicorn src.web.app:app --port 8000
+"""데스크 셋업 시뮬레이터 + AI 채팅 서버(FastAPI). 실행: uvicorn src.app:app --port 8000
 
   GET  /                  시뮬레이터 화면(static/index.html)
   GET  /api/health        상태 확인
@@ -20,11 +20,11 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from src.agent import graph as agent
-from src.core import config
+from src import agent
+from src import config
 
 STATIC_DIR = Path(__file__).parent / "static"
-MAX_HISTORY = 40  # 받는 대화 기록 수. 최근 10개는 원문, 그보다 오래된 것은 요약해서 LLM에 넘긴다(src/agent/memory.py)
+MAX_HISTORY = 40  # 받는 대화 기록 수. 최근 10개는 원문, 그보다 오래된 것은 요약해서 LLM에 넘긴다(src/memory.py)
 
 
 class ToolTrace(BaseModel):

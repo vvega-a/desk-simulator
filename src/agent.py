@@ -5,15 +5,15 @@
                       └─ 도구 호출 있음 ─► act ─► agent ...   (최대 MAX_LOOPS번)
 
   context: 상태·점검 결과를 글로 정리하고 대화를 메시지로 만든다. 미들웨어 역할도 한다.
-           - 질문·이전 대화의 개인정보를 가린다(src/core/guard.py)
+           - 질문·이전 대화의 개인정보를 가린다(src/guard.py)
            - 인젝션 질문을 규칙으로 잡아 shield로 보낸다
-           - 오래된 대화는 요약해 시스템 프롬프트 뒤에 붙인다(src/agent/memory.py, 요약할 때만 LLM 호출)
+           - 오래된 대화는 요약해 시스템 프롬프트 뒤에 붙인다(src/memory.py, 요약할 때만 LLM 호출)
   shield : 인젝션 질문에 고정 안내만 한다
   agent  : LLM이 답하거나 도구를 고른다(문장 단위로 스트리밍)
   act    : 도구를 실행한다.
            list_settings   바로 실행(읽기)
-           search_guides   가이드 문서 하이브리드 검색(RAG, 읽기) — src/rag/retriever.py
-           search_products 지금 물건과 치수가 맞는 상품을 네이버 쇼핑에서 검색(외부 API, 읽기) — src/shop/search.py
+           search_guides   가이드 문서 하이브리드 검색(RAG, 읽기) — src/retriever.py
+           search_products 지금 물건과 치수가 맞는 상품을 네이버 쇼핑에서 검색(외부 API, 읽기) — src/tools.py
                            결과는 화면에 상품 카드로 보낸다(products 이벤트)
            set_view        화면 보기 변경은 되돌리기 쉬워 승인 없이 브라우저에 알린다(client_action 이벤트)
            propose_changes 단일 설정 변경 + 아이템 추가·수정·삭제 → interrupt()로 멈춰 사용자 승인
@@ -24,7 +24,7 @@
   {"type": "step", "phase": "start" | "done", "node": 노드, "label": 이름, "detail"?: 설명}
   {"type": "token", "text": 답변 조각}   (개인정보는 내보내기 전에 한 번 더 가린다)
   {"type": "client_action", "action": "set_view", "view"?, "auto_rotate"?}   (브라우저가 바로 실행)
-  {"type": "products", "label", "query", "url", "items": [{title, link, price, mall, match, size}], "mode", "error"}   (상품 카드)
+  {"type": "products", "label", "query", "url", "items": [{title, link, price, mall, match, size}], "mode", "error", "open"}   (상품 카드. open이면 검색 페이지를 새 탭으로 연다)
   {"type": "approval", "thread_id", "reason", "changes", "patch", "rejected", "notes"}   (승인 대기, 호출이 여기서 끝남)
 """
 import re
@@ -42,14 +42,14 @@ from langgraph.graph.message import add_messages
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
-from src.agent import memory
-from src.agent.context import describe, describe_changes, describe_checks, describe_collections
-from src.agent.settings import (
+from src import memory
+from src.context import describe, describe_changes, describe_checks, describe_collections
+from src.settings import (
     BAD_VALUE_PREFIX, VIEW_NAMES, diff_items, format_settings, validate_ops, validate_patch, validate_scene_action,
 )
-from src.core import guard
-from src.rag.retriever import format_hits
-from src.shop import search as shop
+from src import guard
+from src.retriever import format_hits
+from src import tools as shop
 
 MAX_LOOPS = 6  # agent가 도구를 부르며 돌 수 있는 최대 횟수
 SEARCH_K = 3  # search_guides가 돌려주는 문서 조각 수
@@ -377,14 +377,15 @@ def _search_products(state: AgentState, args: dict, shop_keys: tuple[str, str]) 
         _step_done("act", "찾을 물건을 알아보지 못했어요")
         return target
     r = shop.search(target, str(args.get("keywords") or ""), *shop_keys)
-    _emit({"type": "products", **{k: r[k] for k in ("label", "query", "url", "items", "mode", "error")}})
+    # 상품 목록이 없으면(키 없음·실패) 브라우저가 네이버 쇼핑 검색을 새 탭으로 바로 연다(open)
+    _emit({"type": "products", "open": not r["items"], **{k: r[k] for k in ("label", "query", "url", "items", "mode", "error")}})
     _step_done("act", f"{target.label}에 맞는 상품을 찾았어요({len(r['items'])}개)" if r["items"] else "네이버 쇼핑 검색 링크를 만들었어요")
     return shop.format_result(r)
 
 
 def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", shop_keys=("", "")):
     """llm: ChatBedrockConverse 호환(bind_tools와 stream을 가진 객체). checkpointer는 interrupt에 필요해서 기본으로 메모리를 쓴다.
-    retriever: 가이드 문서 검색기(src.rag.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다.
+    retriever: 가이드 문서 검색기(src.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다.
     summarizer: 오래된 대화 요약 Runnable({conversation} → 글). 기본은 llm으로 만든 LCEL 체인, None이면 요약하지 않는다.
     shop_keys: 네이버 검색 API (Client ID, Client Secret). 비어 있으면 상품 검색은 검색 링크만 돌려준다."""
     tool_llm = llm.bind_tools([ListSettings, SearchGuides, SearchProducts, ProposeChanges, SceneAction, SetView])
@@ -498,9 +499,9 @@ def build_default_graph():
     """.env 설정으로 Bedrock LLM을 만들어 그래프를 구성한다."""
     from langchain_aws import ChatBedrockConverse
 
-    from src.core.config import bedrock_client_config, load_settings
+    from src.config import bedrock_client_config, load_settings
 
-    from src.rag.retriever import build_retriever
+    from src.retriever import build_retriever
 
     s = load_settings()
     retry = bedrock_client_config(s["max_retries"])

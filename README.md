@@ -8,17 +8,17 @@
 > 한 줄 원칙: **LLM은 제안만 한다. 값의 범위는 코드가, 적용 여부는 사용자가, 실제 변경은 브라우저가 정한다.**
 
 ## 활용한 패턴 (Day 1~7)
-- Day 1: LCEL chain + Pydantic 구조화 출력 — 평가의 LLM 판정은 `ChatPromptTemplate | llm.with_structured_output(Verdict) | RunnableLambda`(dict로 변환) LCEL 체인이다(`judge_chain`, `src/evaluation/evaluate.py`). 에이전트는 `bind_tools`의 **Pydantic 인자 스키마**로 모델 출력을 받는다(`ListSettings`·`SearchGuides`·`ProposeChanges`·`ArrayOp`·`SceneAction`·`SetView`). LLM이 낸 값은 그대로 믿지 않고 코드가 스키마(범위·단위·선택지)로 다시 검증한다(`src/agent/settings.py`).
-- Day 2: RAG(하이브리드 검색 + 쿼리 확장) — `search_guides` 도구가 가이드 문서 6개(`knowledge/*.md`, 26개 조각)를 검색한다. **BM25**(어절 + 한글 2-gram) 와 **벡터 검색**(Bedrock Titan Text Embeddings V2, 코사인)을 **RRF**로 합치고, BM25 쪽에는 도메인 동의어 사전으로 **쿼리 확장**("거북목" → 고개·눈높이)을 한다. 임베딩을 쓸 수 없으면 키워드 검색만으로 계속 동작한다. 검색 결과에 출처 제목을 붙여 답변이 "가이드 「모니터 높이와 각도」에 따르면…"처럼 근거를 밝힌다. 리랭커는 쓰지 않았다(조각 26개뿐이고, 이 계정에서 Bedrock 리랭크 모델을 쓸 수 없었다). 코드: `src/rag/retriever.py`
+- Day 1: LCEL chain + Pydantic 구조화 출력 — 평가의 LLM 판정은 `ChatPromptTemplate | llm.with_structured_output(Verdict) | RunnableLambda`(dict로 변환) LCEL 체인이다(`judge_chain`, `src/evaluate.py`). 에이전트는 `bind_tools`의 **Pydantic 인자 스키마**로 모델 출력을 받는다(`ListSettings`·`SearchGuides`·`ProposeChanges`·`ArrayOp`·`SceneAction`·`SetView`). LLM이 낸 값은 그대로 믿지 않고 코드가 스키마(범위·단위·선택지)로 다시 검증한다(`src/settings.py`).
+- Day 2: RAG(하이브리드 검색 + 쿼리 확장) — `search_guides` 도구가 가이드 문서 6개(`data/*.md`, 26개 조각)를 검색한다. **BM25**(어절 + 한글 2-gram) 와 **벡터 검색**(Bedrock Titan Text Embeddings V2, 코사인)을 **RRF**로 합치고, BM25 쪽에는 도메인 동의어 사전으로 **쿼리 확장**("거북목" → 고개·눈높이)을 한다. 임베딩을 쓸 수 없으면 키워드 검색만으로 계속 동작한다. 검색 결과에 출처 제목을 붙여 답변이 "가이드 「모니터 높이와 각도」에 따르면…"처럼 근거를 밝힌다. 리랭커는 쓰지 않았다(조각 26개뿐이고, 이 계정에서 Bedrock 리랭크 모델을 쓸 수 없었다). 코드: `src/retriever.py`
 - Day 3: ReAct 도구 호출 — `agent → act → agent` 루프(최대 6회)에서 LLM이 도구를 고른다. 도구는 4개: `list_settings`(읽기), `propose_changes`(설정 변경 + 물건 추가·수정·삭제), `scene_action`(초기화·슬롯 저장/불러오기), `set_view`(시점·자동 회전). 관련 변경을 `propose_changes` 한 번에 모아 제안하는 구조라 "모니터 + 타공판 + 책상을 한꺼번에 추가해줘"도 한 번의 승인으로 처리된다.
 - Day 5: HITL — 설정을 바꾸는 도구(`propose_changes`·`scene_action`)는 LangGraph `interrupt()`로 멈추고, 화면의 **승인 카드**(바뀌는 값 전→후)에서 "적용하기/취소"를 눌러야 `/api/chat/approve`로 이어진다. 적용 뒤에는 "되돌리기"가 있다. 되돌리기 쉬운 화면 보기 변경(`set_view`)만 승인 없이 바로 적용한다.
-- Day 5: 가드레일 — ① 입력 값: 값은 프롬프트가 아니라 **코드**가 막는다(범위·단위 맞춤, 선택지, 최대 개수, 번호 범위, 빈 슬롯). 서버와 브라우저(`deskSim`)가 같은 규칙으로 두 번 검증한다. ② 출력: 이번 요청에서 실제로 적용된 게 없는데 "저장했어요" 같은 완료를 주장하면 사실 안내를 덧붙인다(`CLAIM`·`NOT_APPLIED_NOTICE`, 정규식 기반이라 새로운 말투는 놓칠 수 있다). ③ 오류 내용(키·권한 정보)은 숨기고 종류만 알린다. ④ **개인정보(PII) 마스킹**: 질문·이전 대화의 전화번호·이메일·주민등록번호·카드번호·주소·"제 이름은 ○○○"를 LLM에 보내기 전에 가리고, LLM 답변 조각과 승인 카드 이유 글도 한 번 더 가린다. ⑤ **프롬프트 인젝션 차단**: "이전 지시 무시", "시스템 프롬프트 알려줘", "지금부터 너는…" 같은 말투를 규칙으로 잡아 **LLM을 부르지 않고** 고정 안내만 한다(`shield` 노드). ④⑤는 고양이 챗봇 `pjt`의 `guard.py`를 옮기면서 이 앱에서 정상 요청인 "설정 바꿔줘", "개수 제한" 같은 말이 걸리지 않게 규칙을 고쳤다(`src/core/guard.py`). 정규식이라 새로운 말투는 놓칠 수 있다.
-- Day 5: 미들웨어(직접 구현) — ① **대화 이력 요약**: 브라우저가 최근 40개 메시지를 보내면 최근 10개는 원문(도구 호출 내역 포함)으로, 그보다 오래된 부분은 LCEL 요약 체인(`PromptTemplate | llm | 글 추출`)으로 3~5문장 요약해 시스템 프롬프트 뒤에 붙인다. 경계는 4개(두 턴) 단위로만 올려 같은 구간은 캐시를 쓰고, 요약에 넣는 글과 결과 모두 마스킹한다. 요약이 실패하면 최근 대화만으로 계속한다(`src/agent/memory.py`, `pjt`의 `history.py`를 옮김). ② **PII 마스킹**(위 가드레일 ④). ③ 대화 기록에 **도구 호출 내역을 함께 저장·복원**(`_trace_of`·`_history_messages`). ④ Bedrock 스로틀링 **재시도**(`bedrock_client_config`). LangChain 미들웨어 API가 아니라 그래프의 `context` 노드와 함수로 구현했다.
+- Day 5: 가드레일 — ① 입력 값: 값은 프롬프트가 아니라 **코드**가 막는다(범위·단위 맞춤, 선택지, 최대 개수, 번호 범위, 빈 슬롯). 서버와 브라우저(`deskSim`)가 같은 규칙으로 두 번 검증한다. ② 출력: 이번 요청에서 실제로 적용된 게 없는데 "저장했어요" 같은 완료를 주장하면 사실 안내를 덧붙인다(`CLAIM`·`NOT_APPLIED_NOTICE`, 정규식 기반이라 새로운 말투는 놓칠 수 있다). ③ 오류 내용(키·권한 정보)은 숨기고 종류만 알린다. ④ **개인정보(PII) 마스킹**: 질문·이전 대화의 전화번호·이메일·주민등록번호·카드번호·주소·"제 이름은 ○○○"를 LLM에 보내기 전에 가리고, LLM 답변 조각과 승인 카드 이유 글도 한 번 더 가린다. ⑤ **프롬프트 인젝션 차단**: "이전 지시 무시", "시스템 프롬프트 알려줘", "지금부터 너는…" 같은 말투를 규칙으로 잡아 **LLM을 부르지 않고** 고정 안내만 한다(`shield` 노드). ④⑤는 고양이 챗봇 `pjt`의 `guard.py`를 옮기면서 이 앱에서 정상 요청인 "설정 바꿔줘", "개수 제한" 같은 말이 걸리지 않게 규칙을 고쳤다(`src/guard.py`). 정규식이라 새로운 말투는 놓칠 수 있다.
+- Day 5: 미들웨어(직접 구현) — ① **대화 이력 요약**: 브라우저가 최근 40개 메시지를 보내면 최근 10개는 원문(도구 호출 내역 포함)으로, 그보다 오래된 부분은 LCEL 요약 체인(`PromptTemplate | llm | 글 추출`)으로 3~5문장 요약해 시스템 프롬프트 뒤에 붙인다. 경계는 4개(두 턴) 단위로만 올려 같은 구간은 캐시를 쓰고, 요약에 넣는 글과 결과 모두 마스킹한다. 요약이 실패하면 최근 대화만으로 계속한다(`src/memory.py`, `pjt`의 `history.py`를 옮김). ② **PII 마스킹**(위 가드레일 ④). ③ 대화 기록에 **도구 호출 내역을 함께 저장·복원**(`_trace_of`·`_history_messages`). ④ Bedrock 스로틀링 **재시도**(`bedrock_client_config`). LangChain 미들웨어 API가 아니라 그래프의 `context` 노드와 함수로 구현했다.
 - Day 7: Plan-Execute(경량) — LLM이 변경 묶음을 **계획**(`propose_changes`에 모음)하고, 코드가 단일 설정 → 물건 추가·수정·삭제 → 장면 동작 순서로 **실행**한다. 실행 결과(적용된 것/못 한 것)와 적용 뒤 점검 결과·번호 목록을 LLM에 돌려줘 마무리 답변을 쓰게 한다.
 - Day 7: Observability — LangSmith 트레이싱 설정(`LANGSMITH_*`)을 넣었다. LangSmith 대시보드에서 `context → agent(ChatBedrock) → route → act → agent(ChatBedrock) → route` 노드와 LLM 호출이 trace로 찍히는 것을 확인했다. 예로 본 질문 1건("모니터1을 모니터 노트북 세트로 변경")은 총 2.97초·12.53K 토큰·$0.0139였고, LLM 호출은 2번(1.07초·5.8K 토큰, 1.85초·6.7K 토큰)이었다. 화면: [docs/langsmith-trace.webp](docs/langsmith-trace.webp). 앱 안에서도 응답 위에 "셋업 읽기 → 생각하기 → 도구 실행" 진행 단계를 보여 준다.
-- Day 7: 평가 — 인-아웃 평가 세트 33건을 실제 Bedrock 에이전트에 반복해서 돌리는 러너(`src/evaluation/evaluate.py`). 채점은 규칙 기반(승인 카드의 patch, 요청하지 않은 변경 혼입, 화면 보기, 답변 문구, 승인·취소 뒤 흐름)이고 범위 밖 5건만 LLM-as-Judge를 쓴다. Bedrock 쓰로틀링 같은 인프라 오류는 재시도하고 통과율의 분모에서 분리한다. 결과는 아래 "인-아웃 세트 통과율". 검색은 따로 질의 20개로 hit@k·MRR을 잰다(`src/evaluation/rag_eval.py`, 아래 "가이드 문서 검색 평가").
+- Day 7: 평가 — 인-아웃 평가 세트 33건을 실제 Bedrock 에이전트에 반복해서 돌리는 러너(`src/evaluate.py`). 채점은 규칙 기반(승인 카드의 patch, 요청하지 않은 변경 혼입, 화면 보기, 답변 문구, 승인·취소 뒤 흐름)이고 범위 밖 5건만 LLM-as-Judge를 쓴다. Bedrock 쓰로틀링 같은 인프라 오류는 재시도하고 통과율의 분모에서 분리한다. 결과는 아래 "인-아웃 세트 통과율". 검색은 따로 질의 20개로 hit@k·MRR을 잰다(`src/rag_eval.py`, 아래 "가이드 문서 검색 평가").
 - 배포: `Dockerfile`·`docker-compose.yml`(비밀 값은 이미지에 넣지 않고 실행할 때 `--env-file .env`).
-- Day 4: 도구 다중 + 외부 API — `search_products`가 지금 셋업의 물건(책상 1, 모니터 2, 서랍장 1 …) 치수·규격을 상태에서 읽어 검색어를 만들고, **네이버 검색 API(쇼핑)**로 상품을 찾아 상품명 속 치수(1400x700, 140x70cm, 27인치 …)로 일치·근접·다름을 나눈다. 결과는 채팅에 **상품 카드**(제목 링크·최저가·판매처·치수 판정)로 뜬다. 키(`NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`)가 없으면 같은 검색어의 네이버 쇼핑 검색 링크만 준다. `shopping.naver.com` 화면은 긁어 오지 않는다(자동 접근 차단·약관). 한 질의에 `list_settings`·`search_guides`·`search_products`·`propose_changes`를 모델이 골라 잇는다. 코드: `src/shop/search.py`
+- Day 4: 도구 다중 + 외부 API — `search_products`가 지금 셋업의 물건(책상 1, 모니터 2, 서랍장 1 …) 치수·규격을 상태에서 읽어 검색어를 만들고, **네이버 검색 API(쇼핑)**로 상품을 찾아 상품명 속 치수(1400x700, 140x70cm, 27인치 …)로 일치·근접·다름을 나눈다. 결과는 채팅에 **상품 카드**(제목 링크·최저가·판매처·치수 판정)로 뜬다. 키(`NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`)가 없으면 같은 검색어의 네이버 쇼핑 검색 링크만 준다. `shopping.naver.com` 화면은 긁어 오지 않는다(자동 접근 차단·약관). 한 질의에 `list_settings`·`search_guides`·`search_products`·`propose_changes`를 모델이 골라 잇는다. 코드: `src/tools.py`
 - 적용하지 않은 패턴: 리랭킹(Day 2), MCP(Day 4), 라우터·supervisor(Day 6, 단일 에이전트), 장기 메모리(Day 7, 대화는 브라우저 메모리에만 있음), RAGAS(Day 7).
 
 ## 아키텍처
@@ -38,7 +38,7 @@ flowchart LR
   G -- "step · token · client_action · approval" --> UI
   UI -- "승인 결과 + 적용 뒤 상태" --> G
   G --> L[(Bedrock<br/>Claude Haiku 4.5)]
-  G --> K[(가이드 문서 knowledge/*.md<br/>BM25 + Titan 임베딩)]
+  G --> K[(가이드 문서 data/*.md<br/>BM25 + Titan 임베딩)]
 ```
 
 ```mermaid
@@ -56,16 +56,16 @@ flowchart LR
   H -- 취소 --> A
 ```
 
-- **서버·화면**: FastAPI 서버(`src/web/app.py`)와 HTML 한 장(`src/web/static/index.html`, Three.js). 서버는 **상태를 보관하지 않는다**. 질문마다 브라우저가 현재 상태·점검 결과·설정 스키마·저장 슬롯 요약을 같이 보낸다.
+- **서버·화면**: FastAPI 서버(`src/app.py`)와 HTML 한 장(`src/static/index.html`, Three.js). 서버는 **상태를 보관하지 않는다**. 질문마다 브라우저가 현재 상태·점검 결과·설정 스키마·저장 슬롯 요약을 같이 보낸다.
 - **에이전트가 쓰는 유일한 통로 `window.deskSim`**: 시뮬레이터 안쪽 구현(IIFE)을 직접 건드리지 않고 이 API로만 읽고 바꾼다. 값은 화면 패널과 같은 정의(범위·선택지)로 검증하고, 추가·삭제는 패널의 버튼·핸들러를 그대로 재사용해서 채팅으로 만든 물건과 손으로 만든 물건의 기본값이 같다.
-- **화면 구성**: 왼쪽 위 **아이템 목록**(현재 씬의 물건 + 추가/삭제), 3D 아래 **선택한 아이템의 상세 설정**, 오른쪽 **채팅 패널**. 모든 물건에는 화면·승인 카드·에이전트가 같은 `이름 번호`(책상 1, 모니터 2, 서랍장 1 …)가 붙고, 지우면 뒤 번호가 당겨진다. 3D 화면에서 물건을 **마우스로 끌어 옮길 수 있다**(모니터 1·추가 모니터·추가 책상·서랍장·모니터+노트북 세트·타공판. 누른 물건이 선택되고, 옮긴 값은 상세 설정의 좌우·앞뒤 값에 그대로 들어간다). 빈 곳을 끌면 화면이 돈다. 책상 1(기준점)과 자동으로 놓이는 키보드·마우스·노트북·스피커·PC 본체·의자는 옮기지 않는다.
+- **화면 구성**: 왼쪽 위 **아이템 목록**(현재 씬의 물건 + 추가/삭제), 3D 아래 **선택한 아이템의 상세 설정**, 오른쪽 **채팅 패널**. 모든 물건에는 화면·승인 카드·에이전트가 같은 `이름 번호`(책상 1, 모니터 2, 서랍장 1 …)가 붙고, 지우면 뒤 번호가 당겨진다. 3D 화면에서 물건을 **마우스로 끌어 옮길 수 있다**(모니터 1·추가 모니터·추가 책상·서랍장·모니터+노트북 세트·타공판. 누른 물건이 선택되고, 옮긴 값은 상세 설정의 좌우·앞뒤 값에 그대로 들어간다). 빈 곳을 끌면 화면이 돈다. 방을 켜면 「방 돌리기」로 방을 90°씩 돌려 창문을 앞·왼쪽·오른쪽·뒤에 둘 수 있다(책상은 그대로, 벽·창문·문이 같이 돈다). 점검에 '창문 방향'(앞이면 눈부심, 뒤면 화면 반사로 주의, 옆이면 좋음)이 들어간다. 책상 1(기준점)과 자동으로 놓이는 키보드·마우스·노트북·스피커·PC 본체·의자는 옮기지 않는다.
 - **독립 모니터**: 모니터 1과 같은 설정(모델·커브드·거치·책상·위치·높이·각도·세로 피벗)을 모니터마다 따로 가진다. 모니터 1 포함 최대 4대.
 - **LLM**: AWS Bedrock(Claude Haiku 4.5). **임베딩**: Bedrock Titan Text Embeddings V2(`BEDROCK_EMBED_MODEL_ID`, 선택). 조각이 26개뿐이라 별도 벡터 DB 없이 서버 시작 때 한 번 임베딩해 메모리에 둔다(약 5초, 백그라운드).
 - **관측**: LangSmith(`LANGSMITH_TRACING=true`와 키를 `.env`에 넣으면 자동으로 trace가 쌓인다). 노드별 걸린 시간과 LLM 호출의 토큰·비용을 볼 수 있다. 스크린샷의 프로젝트 이름이 `mini-pjt`인 것은 실행한 `.env`의 `LANGSMITH_PROJECT`가 그 값이었기 때문이고, `.env.sample`의 기본 이름은 `desk-simulator`다.
 
   ![LangSmith trace: context → agent → route → act → agent → route](docs/langsmith-trace.webp)
 - **설정**: `.env`에만 두며 기본값이 없다. 필수 값이 빠지면 서버가 시작되지 않는다. `.env`는 `.gitignore`로 제외되고 값 없는 `.env.sample`만 저장소에 있다.
-- **조절 대상**: 단일 설정 39개(책상·방·모니터 1·입력 장치·기타 물건), 여러 개 놓는 물건 5종(모니터 2~4, 추가 책상, 서랍장, 모니터+노트북 세트, 타공판), 시점 5종, 저장 슬롯 A/B/C.
+- **조절 대상**: 단일 설정 40개(책상·방·모니터 1·입력 장치·기타 물건), 여러 개 놓는 물건 5종(모니터 2~4, 추가 책상, 서랍장, 모니터+노트북 세트, 타공판), 시점 5종, 저장 슬롯 A/B/C.
 
 ### 도구와 승인
 | 도구 | 하는 일 | 승인 |
@@ -81,40 +81,38 @@ flowchart LR
 ```
 .
 ├─ src/
-│  ├─ agent/
-│  │  ├─ graph.py      LangGraph 에이전트(도구·승인·기록 복원·완료 주장 검사)
-│  │  ├─ settings.py   스키마 기반 값 검증, 변경 전후 비교, 도구 응답 글
-│  │  ├─ context.py    상태·점검 결과를 LLM이 읽을 글로 변환
-│  │  └─ memory.py     대화 이력 요약 미들웨어(요약 구간 나누기·캐시)
-│  ├─ core/
-│  │  ├─ config.py     .env 설정 읽기, Bedrock 재시도 설정
-│  │  └─ guard.py      가드레일: 개인정보 마스킹, 프롬프트 인젝션 판별
-│  ├─ rag/retriever.py 가이드 문서 하이브리드 검색(쿼리 확장·BM25·벡터·RRF)
-│  ├─ shop/search.py   상품 검색(검색어 만들기·네이버 쇼핑 API·상품명 치수 판정)
-│  ├─ evaluation/
-│  │  ├─ evaluate.py   인-아웃 평가 러너(채점·LLM 판정 LCEL 체인·보고서)
-│  │  └─ rag_eval.py   검색 평가(구성별 hit@k·MRR)
-│  └─ web/
-│     ├─ app.py        FastAPI(SSE 스트리밍, 승인 엔드포인트)
-│     └─ static/index.html   3D 시뮬레이터 + 채팅 패널(deskSim API 포함)
-├─ knowledge/          가이드 문서 6개(RAG 지식 베이스, '## ' 절 하나가 조각 하나)
+│  ├─ agent.py        메인 에이전트 그래프(LangGraph: 도구·승인·기록 복원·완료 주장 검사)
+│  ├─ tools.py        도메인 도구: 상품 검색(검색어 만들기·네이버 쇼핑 API·상품명 치수 판정)
+│  ├─ retriever.py    RAG 파이프라인(쿼리 확장·BM25·벡터·RRF)
+│  ├─ settings.py     스키마 기반 값 검증, 변경 전후 비교, 도구 응답 글
+│  ├─ context.py      상태·점검 결과를 LLM이 읽을 글로 변환
+│  ├─ memory.py       대화 이력 요약 미들웨어
+│  ├─ guard.py        가드레일: 개인정보 마스킹, 프롬프트 인젝션 판별
+│  ├─ config.py       .env 설정 읽기, Bedrock 재시도 설정
+│  ├─ app.py          FastAPI(SSE 스트리밍, 승인 엔드포인트)
+│  ├─ evaluate.py     인-아웃 평가 러너(CSV 로드·채점·LLM 판정·보고서)
+│  ├─ rag_eval.py     검색 평가(구성별 hit@k·MRR)
+│  └─ static/index.html   3D 시뮬레이터 + 채팅 패널
+├─ data/              가이드 문서 6개(RAG 지식 베이스, '## ' 절 하나가 조각 하나)
 ├─ evaluation/
-│  ├─ test_queries.json   평가 세트 35건(정상 25(가이드 검색 3·상품 검색 2 포함) · 범위 밖 5 · guardrail 5)
-│  ├─ rag_queries.json    검색 평가 질의 20개(정답 조각 id)
-│  ├─ fixture.json        시뮬레이터에서 내려받은 설정 스키마·기본 상태(평가 입력)
-│  └─ reports/            latest.md(최종 보고서), run1~4(라운드별 원자료), rag_latest.md(검색 평가)
-├─ tests/              Bedrock 없이 도는 테스트 156개
-├─ docs/langsmith-trace.webp   LangSmith trace 화면
-├─ .env.sample         값 없는 설정 예시
-├─ Dockerfile · docker-compose.yml · .dockerignore
-└─ requirements.txt
+│  ├─ test_queries.csv   인-아웃 평가 세트 35건
+│  ├─ round1_report.md   1차 자체 평가 결과
+│  ├─ round2_report.md   2차 자체 평가 결과(개선 후)
+│  ├─ rag_queries.json   검색 평가 질의 20개
+│  ├─ fixture.json       평가 입력(설정 스키마·기본 상태)
+│  └─ reports/           라운드별 원자료, rag_latest.md
+├─ tests/              Bedrock 없이 도는 테스트
+├─ docs/langsmith-trace.webp
+├─ SERVICE.md · README.md · requirements.txt
+├─ Dockerfile · docker-compose.yml · .dockerignore · .env.sample
+└─ run.sh              서버 실행 스크립트
 ```
 
 ## 실행 방법
 ```bash
 pip install -r requirements.txt            # Python 3.14에서 개발·테스트
 cp .env.sample .env                        # AWS 키, 리전, 모델 ID 등 값을 채운다(없으면 서버가 시작되지 않는다)
-uvicorn src.web.app:app --port 8000        # http://localhost:8000 에서 사용
+uvicorn src.app:app --port 8000        # http://localhost:8000 에서 사용
 ```
 Docker로 실행(`.env`는 이미지에 들어가지 않고 실행할 때 넘긴다):
 ```bash
@@ -123,8 +121,8 @@ docker run --rm -p 8000:8000 --env-file .env desk-simulator   # 또는 docker co
 ```
 ```bash
 python -m pytest tests                     # Bedrock 없이 도는 테스트 156개(가짜 LLM·가짜 임베딩)
-python -m src.evaluation.evaluate          # 인-아웃 평가: 실제 Bedrock, 35건 × 3회 ≈ 4~5분 → evaluation/reports/latest.md
-python -m src.evaluation.rag_eval          # 검색 평가: 질의 20개, 구성 4가지 → evaluation/reports/rag_latest.md
+python -m src.evaluate          # 인-아웃 평가: 실제 Bedrock, 35건 × 3회 ≈ 4~5분 → evaluation/round2_report.md
+python -m src.rag_eval          # 검색 평가: 질의 20개, 구성 4가지 → evaluation/reports/rag_latest.md
 ```
 - 상품 검색에서 상품 목록까지 받으려면 [네이버 개발자센터](https://developers.naver.com)에서 애플리케이션을 등록하고 '검색' API를 골라 받은 키를 `.env`의 `NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`에 넣는다. 비우면 치수에 맞춘 네이버 쇼핑 검색 링크만 보여 준다.
 - 가이드 문서 검색의 벡터 쪽을 쓰려면 `.env`에 `BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0`(모델 접근 권한 필요). 비우면 키워드(BM25) 검색만 한다.
@@ -156,7 +154,7 @@ python -m src.evaluation.rag_eval          # 검색 평가: 질의 20개, 구성
 - answer_relevancy: — (미측정)
 
 ## 인-아웃 세트 통과율 (자체 평가)
-평가 세트 [`evaluation/test_queries.json`](evaluation/test_queries.json) 35건(정상 요청 25(가이드 검색 `rag_*` 3건·상품 검색 `shop_*` 2건 포함) · 범위 밖 5 · guardrail 5)을 **실제 Bedrock 에이전트에 케이스당 3회**(총 105번) 돌렸다. 7차까지는 33건, 4차까지는 30건이었다. 4차까지는 30건(90번)이었다. 채점은 규칙 기반(승인 카드의 patch가 기대와 맞는지, 요청하지 않은 변경이 섞였는지, 화면 보기·답변 문구, 승인·취소 뒤 흐름)이고 범위 밖 5건만 LLM 판정을 더한다. 모든 실행에 공통으로 "서버 오류 없음"과 "적용 결과 없이 완료를 주장하지 않음"을 본다. **통과 = 그 실행이 모든 기대를 만족함.** Bedrock 쓰로틀링처럼 에이전트와 무관한 **인프라 오류로 끝내 못 돌린 실행은 분모에서 뺐다**(건수는 따로 보고).
+평가 세트 [`evaluation/test_queries.csv`](evaluation/test_queries.csv) 35건(정상 요청 25(가이드 검색 `rag_*` 3건·상품 검색 `shop_*` 2건 포함) · 범위 밖 5 · guardrail 5)을 **실제 Bedrock 에이전트에 케이스당 3회**(총 105번) 돌렸다. 7차까지는 33건, 4차까지는 30건이었다. 4차까지는 30건(90번)이었다. 채점은 규칙 기반(승인 카드의 patch가 기대와 맞는지, 요청하지 않은 변경이 섞였는지, 화면 보기·답변 문구, 승인·취소 뒤 흐름)이고 범위 밖 5건만 LLM 판정을 더한다. 모든 실행에 공통으로 "서버 오류 없음"과 "적용 결과 없이 완료를 주장하지 않음"을 본다. **통과 = 그 실행이 모든 기대를 만족함.** Bedrock 쓰로틀링처럼 에이전트와 무관한 **인프라 오류로 끝내 못 돌린 실행은 분모에서 뺐다**(건수는 따로 보고).
 
 - 1차 (개선 전): **56 / 63 통과 (89%)** — 90번 중 쓰로틀링 27번을 뺀 값. 정상 47/47, 범위 밖 6/6, guardrail 3/10
 - 4차 (개선 후, RAG 전): **87 / 90 통과 (97%)** — 정상 58/60, 범위 밖 15/15, guardrail 14/15. 케이스 단위(3회 모두 통과) 27/30
@@ -164,7 +162,7 @@ python -m src.evaluation.rag_eval          # 검색 평가: 질의 20개, 구성
 - 최종 (6차, PII 마스킹·인젝션 차단·대화 요약 추가 후): **98 / 99 통과 (99%)** — 정상 68/69, 범위 밖 15/15, guardrail 15/15. 케이스 단위 32/33. `out_injection`은 이제 모델이 아니라 규칙이 막는다(3/3, LLM 호출 없음)
 - 개선폭: **+8%p** (89% → 97%), guardrail은 **+63%p** (3/10 → 14/15). 주요 개선 사항: 취소한 요청에서 승인 카드를 또 띄우지 않게 코드로 차단, 개수 한도를 상태 설명에 넣어 "최대 4대"를 안내, 범위 밖 값은 모델이 계산하지 않고 코드가 맞추게 함, 이해하지 못한 값이 섞인 제안은 모델에게 돌려보내 고치게 함
 - 지연(6차): P50 3.1초 · P90 6.0초(질문 1건 완료까지, 승인 뒤 이어진 호출 포함). 5차는 P50 2.9초 · P90 6.1초, 4차는 P50 2.2초 · P90 4.4초였다. 검색을 거치는 질문은 LLM을 한 번 더 부르고 문서 글이 더 들어가서 느려진다 · 거짓 완료 주장 0건 · 서버 오류 0건
-- 보고서: [evaluation/reports/latest.md](evaluation/reports/latest.md)(8차, 케이스별 결과와 실패 사유). 라운드별 원자료는 `evaluation/reports/run1~7.json`
+- 보고서: [evaluation/round2_report.md](evaluation/round2_report.md)(2차 · 개선 후, 케이스별 결과와 실패 사유). 라운드별 원자료는 `evaluation/reports/run1~7.json`
 
 | 라운드 | 무엇을 바꿨나 | 유효 실행 통과 | 정상 | 범위 밖 | guardrail |
 |---|---|---|---|---|---|
@@ -236,20 +234,20 @@ python -m src.evaluation.rag_eval          # 검색 평가: 질의 20개, 구성
 
 ## 핵심 코드 위치
 줄 번호는 현재 작업 트리 기준이라 코드를 고치면 달라질 수 있다.
-- `src/agent/graph.py:357` — 메인 에이전트 그래프(`build_graph`). 노드 `context:365`(마스킹·인젝션 판별·대화 요약), `shield:385`, `agent:389`, `act:404`, `after_context:438`, `route:441`. 시스템 프롬프트 `SYSTEM_PROMPT:53`, 도구 스키마 `ListSettings:87`·`SearchGuides:96`·`ArrayOp:102`·`ProposeChanges:118`·`SceneAction:126`·`SetView:134`
-- `src/agent/graph.py:251` — 승인 카드 `_ask_approval`, 제안 처리 `_propose:263`(이해하지 못한 값은 카드 대신 모델에게 돌려보냄), 장면 동작 `_scene_action:294`, 화면 보기 `_set_view:301`, 가이드 검색 `_search_guides:320`, 요약 체인 `default_summarizer:335`·`_summarize:342`
-- `src/agent/graph.py:201` — 대화 기록 복원 `_history_messages`, 도구 호출 기록 추출 `_trace_of:219`, 완료 주장 안전장치 `CLAIM:197`, 취소 뒤 재제안 차단 `REJECTED_TEXT:193`·`ALREADY_DECLINED_TEXT:194`(`act`에서 사용), 출력 마스킹 `_stream_reply:175`
-- `src/agent/graph.py:461` — 기본 그래프 구성 `build_default_graph`(Bedrock LLM + 검색기), 스트리밍 진입 `_run:478`, `ask_stream:493`, `resume_stream:501`
-- `src/core/guard.py:55` — 개인정보 마스킹 `redact`, 인젝션 판별 `looks_like_injection:68`(`_INJECTION:40`), 고정 안내 `INJECTION_NOTICE:21`
-- `src/agent/memory.py:34` — 요약 구간 나누기 `plan`(`KEEP:17`), 요약에 넣을 줄 `format_lines:43`, 요약 프롬프트 `SUMMARY_PROMPT:22`, 캐시 `cached:58`·`store:66`
-- `src/rag/retriever.py:141` — 하이브리드 검색기 `HybridRetriever`(`search`, 문서 임베딩 `warm_up`), 쿼리 확장 `SYNONYMS:24`·`expand_query:66`, 토큰화 `tokenize:56`, 조각 나누기 `load_chunks:76`, `BM25:103`, 융합 `rrf:130`, 도구 결과 글 `format_hits:196`, 구성 `build_retriever:204`
-- `src/agent/settings.py:67` — 도메인 검증(도구의 `tools.py` 격): `validate_patch`, 물건 추가·수정·삭제 `validate_ops:143`, 장면 동작 `validate_scene_action:203`, 변경 전후 비교 `diff_items:125`, 도구 응답 글 `format_settings:30`
-- `src/agent/context.py:29` — 상태·점검 결과를 LLM이 읽을 글로 바꾸는 `describe`, 물건 번호·개수 한도 목록 `describe_collections:64`
-- `src/web/app.py:113` — 채팅 스트림 `chat_stream`, 승인 `chat_approve:123`, 요청 모델 `ChatRequest:44`·`ApproveRequest:54`
-- `src/web/static/index.html:1457` — 에이전트용 API `window.deskSim`. 값 검증 `checkValue:1334`, 단일 설정 `applyPatch:1344`, 물건 정의 `COLS:1361`·`collections:1378`, 물건 편집 `setFields:1400`·`runOp:1415`, 장면 동작 `runAction:1436`, 묶음 적용 `applyChanges:1448`, 예전 슬롯 변환 `migrate:1310`
-- `src/web/static/index.html:1102` — 3D 장면 `build`, 독립 모니터 `buildMonitorItem:755`·`newMonitor:745`·`renderMonitors:778`, 인체공학 점검 `renderChecks:1218`
-- `src/web/static/index.html:336` — 아이템 목록·상세 설정: `ARR:336`, `ITEM_DEFS:344`, `renderItems:441`
-- `src/web/static/index.html:858` — 마우스로 끌어 옮기기: 물건 고르기 `pickItem`, 이동 → 설정 값 변환 `moveItem:882`
-- `src/web/static/index.html:1477` — 채팅 패널(스트림 읽기, 승인 카드, 되돌리기)
-- `src/evaluation/evaluate.py:113` — 평가 러너: 한 실행 채점 `check_run`, 승인 카드 patch 비교 `check_patch:63`, 승인·취소 뒤 `check_after_resume:159`, 범위 밖 판정 LCEL 체인 `judge_chain:202`·`judge_out_of_scope:211`(`JUDGE_PROMPT:190`), 인프라 오류 재시도·분리 `run_case:237`·`is_infra_error:232`, 집계 `summarize_runs:276`, 보고서 `render_report:308`, 진입점 `main:337`
-- `src/evaluation/rag_eval.py` — 검색 평가: 구성 `CONFIGS`, 채점 `score_queries`(hit@1·hit@k·MRR)
+- `src/agent.py:357` — 메인 에이전트 그래프(`build_graph`). 노드 `context:365`(마스킹·인젝션 판별·대화 요약), `shield:385`, `agent:389`, `act:404`, `after_context:438`, `route:441`. 시스템 프롬프트 `SYSTEM_PROMPT:53`, 도구 스키마 `ListSettings:87`·`SearchGuides:96`·`ArrayOp:102`·`ProposeChanges:118`·`SceneAction:126`·`SetView:134`
+- `src/agent.py:251` — 승인 카드 `_ask_approval`, 제안 처리 `_propose:263`(이해하지 못한 값은 카드 대신 모델에게 돌려보냄), 장면 동작 `_scene_action:294`, 화면 보기 `_set_view:301`, 가이드 검색 `_search_guides:320`, 요약 체인 `default_summarizer:335`·`_summarize:342`
+- `src/agent.py:201` — 대화 기록 복원 `_history_messages`, 도구 호출 기록 추출 `_trace_of:219`, 완료 주장 안전장치 `CLAIM:197`, 취소 뒤 재제안 차단 `REJECTED_TEXT:193`·`ALREADY_DECLINED_TEXT:194`(`act`에서 사용), 출력 마스킹 `_stream_reply:175`
+- `src/agent.py:461` — 기본 그래프 구성 `build_default_graph`(Bedrock LLM + 검색기), 스트리밍 진입 `_run:478`, `ask_stream:493`, `resume_stream:501`
+- `src/guard.py:55` — 개인정보 마스킹 `redact`, 인젝션 판별 `looks_like_injection:68`(`_INJECTION:40`), 고정 안내 `INJECTION_NOTICE:21`
+- `src/memory.py:34` — 요약 구간 나누기 `plan`(`KEEP:17`), 요약에 넣을 줄 `format_lines:43`, 요약 프롬프트 `SUMMARY_PROMPT:22`, 캐시 `cached:58`·`store:66`
+- `src/retriever.py:141` — 하이브리드 검색기 `HybridRetriever`(`search`, 문서 임베딩 `warm_up`), 쿼리 확장 `SYNONYMS:24`·`expand_query:66`, 토큰화 `tokenize:56`, 조각 나누기 `load_chunks:76`, `BM25:103`, 융합 `rrf:130`, 도구 결과 글 `format_hits:196`, 구성 `build_retriever:204`
+- `src/settings.py:67` — 도메인 검증(도구의 `tools.py` 격): `validate_patch`, 물건 추가·수정·삭제 `validate_ops:143`, 장면 동작 `validate_scene_action:203`, 변경 전후 비교 `diff_items:125`, 도구 응답 글 `format_settings:30`
+- `src/context.py:29` — 상태·점검 결과를 LLM이 읽을 글로 바꾸는 `describe`, 물건 번호·개수 한도 목록 `describe_collections:64`
+- `src/app.py:113` — 채팅 스트림 `chat_stream`, 승인 `chat_approve:123`, 요청 모델 `ChatRequest:44`·`ApproveRequest:54`
+- `src/static/index.html:1457` — 에이전트용 API `window.deskSim`. 값 검증 `checkValue:1334`, 단일 설정 `applyPatch:1344`, 물건 정의 `COLS:1361`·`collections:1378`, 물건 편집 `setFields:1400`·`runOp:1415`, 장면 동작 `runAction:1436`, 묶음 적용 `applyChanges:1448`, 예전 슬롯 변환 `migrate:1310`
+- `src/static/index.html:1102` — 3D 장면 `build`, 독립 모니터 `buildMonitorItem:755`·`newMonitor:745`·`renderMonitors:778`, 인체공학 점검 `renderChecks:1218`
+- `src/static/index.html:336` — 아이템 목록·상세 설정: `ARR:336`, `ITEM_DEFS:344`, `renderItems:441`
+- `src/static/index.html:858` — 마우스로 끌어 옮기기: 물건 고르기 `pickItem`, 이동 → 설정 값 변환 `moveItem:882`
+- `src/static/index.html:1477` — 채팅 패널(스트림 읽기, 승인 카드, 되돌리기)
+- `src/evaluate.py:113` — 평가 러너: 한 실행 채점 `check_run`, 승인 카드 patch 비교 `check_patch:63`, 승인·취소 뒤 `check_after_resume:159`, 범위 밖 판정 LCEL 체인 `judge_chain:202`·`judge_out_of_scope:211`(`JUDGE_PROMPT:190`), 인프라 오류 재시도·분리 `run_case:237`·`is_infra_error:232`, 집계 `summarize_runs:276`, 보고서 `render_report:308`, 진입점 `main:337`
+- `src/rag_eval.py` — 검색 평가: 구성 `CONFIGS`, 채점 `score_queries`(hit@1·hit@k·MRR)

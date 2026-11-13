@@ -1,5 +1,5 @@
 {
- "description": "가이드 문서 검색(search_guides) 평가 세트. relevant는 정답 조각 id(knowledge/파일이름#절 순번). 하나라도 상위 k에 들면 hit. 실행: python -m src.evaluation.rag_eval",
+ "description": "가이드 문서 검색(search_guides) 평가 세트. relevant는 정답 조각 id(data/파일이름#절 순번). 하나라도 상위 k에 들면 hit. 실행: python -m src.rag_eval",
  "queries": [
   {"id": "q_dist_formula", "query": "모니터랑 눈 사이 거리는 얼마가 적당해?", "relevant": ["viewing-distance#1"]},
   {"id": "q_dist_32", "query": "32인치 모니터는 몇 cm 떨어져서 봐야 돼?", "relevant": ["viewing-distance#1", "monitor-choice#5"]},
@@ -20,6 +20,7 @@
   {"id": "q_aisle", "query": "책상 뒤로 의자 뺄 공간이 얼마나 있어야 돼?", "relevant": ["space-layout#2"]},
   {"id": "q_drawer", "query": "책상 아래에 서랍 넣으면 다리 들어가?", "relevant": ["space-layout#3"]},
   {"id": "q_arm", "query": "모니터암 달면 뭐가 좋아?", "relevant": ["monitor-choice#3"]},
-  {"id": "q_uw_vs_dual", "query": "울트라와이드 하나 살까 모니터 두 대 살까", "relevant": ["monitor-choice#2"]}
+  {"id": "q_uw_vs_dual", "query": "울트라와이드 하나 살까 모니터 두 대 살까", "relevant": ["monitor-choice#2"]},
+  {"id": "q_window", "query": "창문이 모니터 뒤에 있는데 괜찮아?", "relevant": ["space-layout#6", "viewing-distance#4"]}
  ]
 }

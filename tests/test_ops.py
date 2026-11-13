@@ -1,9 +1,9 @@
 """물건 추가·수정·삭제, 장면 동작(슬롯·초기화), 화면 보기 도구 테스트(Bedrock 없이)."""
 from langchain_core.messages import AIMessageChunk
 
-from src.agent import graph as agent
-from src.agent.context import describe
-from src.agent.settings import format_settings, validate_ops, validate_scene_action
+from src import agent
+from src.context import describe
+from src.settings import format_settings, validate_ops, validate_scene_action
 from tests.test_agent import CHECKS, SCHEMA, STATE, FakeLLM, call, run, text, tool_messages
 
 COLLECTIONS = {
@@ -189,7 +189,7 @@ def test_result_trace_lists_only_executed_tools_of_this_question():
 def test_history_tools_are_validated_by_the_api(monkeypatch):
     from fastapi.testclient import TestClient
 
-    from src.web import app as web
+    from src import app as web
 
     monkeypatch.setattr(web, "get_graph", lambda: agent.build_graph(FakeLLM(text("x"))))
     client = TestClient(web.app)
@@ -309,7 +309,7 @@ def test_add_monitor_with_values_shows_a_clear_card_label():
 # ---- 평가에서 발견한 약점의 회귀 방지 ------------------------------------------------------------
 
 def test_user_who_declined_is_not_asked_again_in_the_same_request():
-    from src.agent.graph import ALREADY_DECLINED_TEXT, REJECTED_TEXT
+    from src.agent import ALREADY_DECLINED_TEXT, REJECTED_TEXT
 
     llm = FakeLLM(call("ProposeChanges", {"changes": {"mon": "32"}, "reason": "크게"}, "c1"),
                   call("ProposeChanges", {"changes": {"monBack": 300}, "reason": "대안"}, "c2"),  # 거절 직후 또 제안
@@ -343,7 +343,7 @@ def test_describe_shows_capacity_so_the_agent_does_not_ask_about_position_when_f
 # ---- 선택지 이해·버려진 값 표시·범위 처리(평가 2차에서 발견) -------------------------------------
 
 def test_option_given_as_partial_label_is_understood_when_unique():
-    from src.agent.settings import validate_patch
+    from src.settings import validate_patch
 
     fields = COLLECTIONS["drawers"]["fields"]
     clean, rejected, notes = validate_patch({"where": "오른쪽"}, fields)

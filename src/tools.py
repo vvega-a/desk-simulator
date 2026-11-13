@@ -15,7 +15,7 @@ import re
 import urllib.parse
 from dataclasses import dataclass, field
 
-from src.core import guard
+from src import guard
 
 SHOP_API = "https://openapi.naver.com/v1/search/shop.json"
 SEARCH_URL = "https://search.shopping.naver.com/ns/search?query="
@@ -215,13 +215,13 @@ def format_result(r: dict) -> str:
     if r.get("notes"):
         head += " 참고: " + "; ".join(r["notes"]) + "."
     if r["mode"] == "link" and not r.get("error"):
-        return head + (" 쇼핑 API 키가 없어 상품 목록은 가져오지 못했어요. 화면 카드에는 이 검색어로 네이버 쇼핑을 여는 링크 하나만 있어요."
-                       " 상품이 '나왔다'·'떴다'고 말하지 말고, 어떤 검색어로 링크를 만들었는지와 링크를 눌러 고르라는 것만 말하세요."
-                       " 상품 이름·가격을 지어내지 마세요.")
+        return head + (" 쇼핑 API 키가 없어 상품 목록은 가져오지 못했어요. 대신 이 검색어로 네이버 쇼핑 검색 결과를 새 탭으로 열었어요"
+                       "(브라우저가 팝업을 막으면 화면 카드의 링크로 열 수 있어요). 어떤 검색어로 열었는지와 새 탭에서 치수를 보고 고르라는 것만 말하고,"
+                       " 상품 이름·가격은 모르니 지어내지 마세요.")
     if r.get("error"):
-        return head + f" 상품 검색에 실패했어요({r['error']}). 검색 링크만 화면 카드로 보여 줬어요. 상품 이름·가격을 지어내지 마세요."
+        return head + f" 상품 검색에 실패했어요({r['error']}). 대신 같은 검색어로 네이버 쇼핑 검색 결과를 새 탭으로 열었어요. 상품 이름·가격을 지어내지 마세요."
     if not r["items"]:
-        return head + " 맞는 상품을 찾지 못했어요. 검색 링크만 화면 카드로 보여 줬어요."
+        return head + " 맞는 상품을 찾지 못했어요. 대신 같은 검색어로 네이버 쇼핑 검색 결과를 새 탭으로 열었어요."
     lines = [head, "치수 판정은 상품명에 적힌 치수 기준이라 판매 페이지에서 꼭 확인하라고 말하세요. 화면에 상품 카드가 떠 있어요:"]
     for n, it in enumerate(r["items"], 1):
         size = f", 상품명 치수 {it['size']}" if it["size"] else ""

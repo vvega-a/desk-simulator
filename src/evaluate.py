@@ -1,6 +1,6 @@
-"""인-아웃 평가 러너: evaluation/test_queries.json의 케이스를 실제 Bedrock 에이전트에 돌려 통과율을 잰다.
+"""인-아웃 평가 러너: evaluation/test_queries.csv의 케이스를 실제 Bedrock 에이전트에 돌려 통과율을 잰다.
 
-실행:  python -m src.evaluation.evaluate [--repeats 3] [--cases id1,id2] [--workers 4]
+실행:  python -m src.evaluate [--repeats 3] [--cases id1,id2] [--workers 4]
 결과:  evaluation/reports/latest.json (실행별 원자료), latest.md (사람이 읽는 보고서)
 
 무엇을 재나
@@ -11,7 +11,7 @@
     copy(JSON.stringify({state:deskSim.getState(),checks:deskSim.getChecks(),schema:deskSim.schema(),
                          collections:deskSim.collections(),slots:deskSim.slots()}))
 
-케이스 형식(test_queries.json)
+케이스 형식(test_queries.csv)
   id, category(in|out|guardrail), question
   state(기본 상태 위에 덮어쓸 값) · slots · history(이전 대화, 도구 호출 내역 포함) · resume(approve|reject)
   expect:
@@ -28,6 +28,7 @@
 """
 import argparse
 import copy
+import csv
 import json
 import os
 import statistics
@@ -42,11 +43,26 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda
 from pydantic import BaseModel, Field
 
-from src.agent import graph as agent
-from src.agent.graph import CLAIM, NOT_APPLIED_NOTICE
+from src import agent
+from src.agent import CLAIM, NOT_APPLIED_NOTICE
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = ROOT / "evaluation"
+_JSON_COLS = ("expect", "state", "history", "slots")
+
+
+def load_cases(path=None) -> list[dict]:
+    """evaluation/test_queries.csv를 케이스 dict 목록으로 읽는다. expect·state·history·slots 칸은 JSON 문자열, 빈 칸은 생략."""
+    path = path or EVAL_DIR / "test_queries.csv"
+    cases = []
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            c = {k: v for k, v in row.items() if v != ""}
+            for k in _JSON_COLS:
+                if k in c:
+                    c[k] = json.loads(c[k])
+            cases.append(c)
+    return cases
 
 
 # ---------------------------------------------------------------------------------------------
@@ -357,7 +373,7 @@ def render_report(meta: dict, summary: dict) -> str:
 def main():
     from langchain_aws import ChatBedrockConverse
 
-    from src.core.config import bedrock_client_config, load_settings
+    from src.config import bedrock_client_config, load_settings
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--repeats", type=int, default=3)
@@ -367,7 +383,7 @@ def main():
     args = ap.parse_args()
 
     fixture = json.loads((EVAL_DIR / "fixture.json").read_text(encoding="utf-8"))
-    cases = json.loads((EVAL_DIR / "test_queries.json").read_text(encoding="utf-8"))["cases"]
+    cases = load_cases()
     if args.cases:
         wanted = set(args.cases.split(","))
         cases = [c for c in cases if c["id"] in wanted]

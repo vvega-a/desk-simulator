@@ -1,8 +1,8 @@
 """Bedrock·네이버 API 없이 도는 상품 검색 테스트: 검색 대상 만들기, 상품명 치수 읽기·판정, API 호출(가짜), 키 없을 때 링크, 에이전트 도구."""
 import pytest
 
-from src.agent import graph as agent
-from src.shop import search as shop
+from src import agent
+from src import tools as shop
 from tests.test_agent import CHECKS, SCHEMA, STATE, FakeLLM, call, text, tool_messages
 
 STATE2 = {**STATE, "mon": "34uw", "curved": True, "monitors": [{"mon": "27", "curved": False}],
@@ -100,6 +100,7 @@ def test_search_products_tool_emits_cards_and_feeds_results_to_llm(monkeypatch):
     events = list(agent.ask_stream(g, "지금 책상 맞는 모델 찾아줘", [], STATE2, CHECKS, SCHEMA, thread_id="t1"))
     cards = [e for e in events if e["type"] == "products"]
     assert len(cards) == 1 and cards[0]["items"][0]["match"] == "일치" and cards[0]["label"] == "책상 1"
+    assert cards[0]["open"] is False  # 상품 목록이 있으면 새 탭을 열지 않는다
     assert "[일치] 책상 1400x700 원목" in tool_messages(llm, 1)[0]
     assert not any(e["type"] == "approval" for e in events)
 
@@ -109,3 +110,12 @@ def test_search_products_for_missing_item_returns_reason():
     g = agent.build_graph(llm)
     events = list(agent.ask_stream(g, "타공판 찾아줘", [], STATE2, CHECKS, SCHEMA, thread_id="t1"))
     assert tool_messages(llm, 1)[0] == "타공판이 없어요." and not any(e["type"] == "products" for e in events)
+
+
+def test_without_keys_the_browser_is_told_to_open_the_search_page():
+    llm = FakeLLM(call("SearchProducts", {"target": "책상 1"}), text("네이버 쇼핑을 열었어요."))
+    g = agent.build_graph(llm)  # 키 없음
+    events = list(agent.ask_stream(g, "책상 찾아줘", [], STATE2, CHECKS, SCHEMA, thread_id="t1"))
+    card = next(e for e in events if e["type"] == "products")
+    assert card["open"] is True and card["items"] == [] and card["url"].startswith(shop.SEARCH_URL)
+    assert "새 탭으로 열었어요" in tool_messages(llm, 1)[0]

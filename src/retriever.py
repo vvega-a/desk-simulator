@@ -1,6 +1,6 @@
 """가이드 문서 하이브리드 검색: 쿼리 확장 → BM25(키워드) + 벡터(Bedrock Titan 임베딩) → RRF 융합.
 
-  knowledge/*.md ─► '## ' 제목 단위 조각(Chunk)
+  data/*.md ─► '## ' 제목 단위 조각(Chunk)
   질문 ─► expand_query(도메인 동의어 사전, LLM 없음) ─► BM25 순위 ─┐
        └──────────────────────────────────────────► 벡터 순위 ─┴─► RRF(1/(60+순위) 합) ─► 상위 k개
 
@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-KNOWLEDGE_DIR = Path(__file__).resolve().parents[2] / "knowledge"
+KNOWLEDGE_DIR = Path(__file__).resolve().parents[1] / "data"
 RRF_K = 60  # RRF 상수. 순위 차이가 점수에 미치는 영향을 완만하게 한다(흔히 쓰는 값)
 CANDIDATES = 10  # 검색기마다 융합에 넘기는 후보 수
 

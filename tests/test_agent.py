@@ -4,10 +4,10 @@ import json
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessageChunk, ToolMessage
 
-from src.agent import graph as agent
-from src.agent.context import describe
-from src.agent.settings import diff_items, format_settings, validate_patch
-from src.web import app as web
+from src import agent
+from src.context import describe
+from src.settings import diff_items, format_settings, validate_patch
+from src import app as web
 
 STATE = {
     "deskW": 1400, "deskD": 700, "deskH": 720, "mon": "27", "curved": False, "mount": "stand",

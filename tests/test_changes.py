@@ -4,9 +4,9 @@ import copy
 from fastapi.testclient import TestClient
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.agent import graph as agent
-from src.agent.context import describe, describe_changes
-from src.web import app as web
+from src import agent
+from src.context import describe, describe_changes
+from src import app as web
 from tests.test_agent import CHECKS, SCHEMA, STATE, FakeLLM, text
 
 COLL = {"drawers": {"label": "서랍장", "max": 4, "fields": [{"key": "x", "label": "좌우 이동"}, {"key": "z", "label": "앞뒤 이동"}]},
@@ -70,7 +70,7 @@ def test_api_passes_prev_state_through(monkeypatch):
 
 
 def test_eval_synthesizes_the_state_after_approval():
-    from src.evaluation.evaluate import synth_state
+    from src.evaluate import synth_state
     state = {"deskW": 1400, "drawers": [{"where": "underL"}, {"where": "underR"}]}
     after = synth_state(state, {"changes": {"deskW": 1600}, "array_ops": [{"op": "add", "collection": "drawers", "values": {"tiers": 4}},
                                                                          {"op": "remove", "collection": "drawers", "index": 0}]})
@@ -82,3 +82,10 @@ def test_api_accepts_null_prev_state_on_the_first_question(monkeypatch):
     monkeypatch.setattr(web, "get_graph", lambda: agent.build_graph(llm))
     r = TestClient(web.app).post("/api/chat/stream", json={"question": "어때?", "history": [], "state": STATE, "prev_state": None})
     assert r.status_code == 200 and "직접 바꾼 것" not in llm.calls[0][-1].content
+
+
+def test_room_rotation_is_described_as_window_direction():
+    room = {**STATE, "room": True, "roomW": 3000, "roomD": 3300, "roomH": 2300, "win": True}
+    assert "앉았을 때 창문이 앞(모니터 뒤)" in describe({**room, "roomRot": 0}, [])
+    assert "방 돌리기(roomRot) 90° = 앉았을 때 창문이 왼쪽" in describe({**room, "roomRot": 90}, [])
+    assert "창문 없음" in describe({**room, "win": False}, [])
