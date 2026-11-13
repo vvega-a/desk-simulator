@@ -13,7 +13,7 @@
 - **Day 4: 도구 다중 + 외부 API** — `search_products`가 현재 물건의 치수로 검색어를 만들고 **네이버 쇼핑 검색 API**로 상품을 찾아 상품명 속 치수로 일치·근접·다름을 판정, 채팅에 상품 카드로 보여 준다. 키가 없으면 검색 링크만 준다. 쇼핑 화면은 긁어 오지 않는다. 코드: `src/tools.py`
 - **Day 5: HITL** — 설정을 바꾸는 도구(`propose_changes`·`scene_action`)는 LangGraph `interrupt()`로 멈추고, **승인 카드**(전→후)에서 "적용하기/취소"를 눌러야 `/api/chat/approve`로 이어진다. 적용 뒤에는 "되돌리기". 화면 보기(`set_view`)만 승인 없이 적용한다.
 - **Day 5: 가드레일** — ① 값 검증은 프롬프트가 아니라 **코드**(범위·단위·선택지·최대 개수·번호·빈 슬롯, 서버와 브라우저가 두 번). ② 적용된 게 없는데 "했어요"라고 하면 사실 안내를 덧붙임(`CLAIM`·`NOT_APPLIED_NOTICE`). ③ 오류 상세 숨김. ④ **PII 마스킹**(LLM에 보내기 전·후). ⑤ **인젝션 차단**(규칙으로 잡아 LLM 없이 고정 안내, `shield` 노드). ⑥ **범위 밖 요청 차단**(날씨·주가·코드 작성·번역 같은 주제 말이 있고 셋업 관련 말이 없으면 LLM 없이 고정 안내, 같은 `shield` 노드. 셋업 말이 섞인 질문과 목록에 없는 주제는 통과시켜 시스템 프롬프트 규칙이 2차로 막는다). 코드: `src/guard.py`. 정규식이라 새 말투·새 주제는 놓칠 수 있다.
-- **Day 5: 미들웨어(직접 구현)** — **대화 이력 요약**(최근 10개는 원문, 이전은 LCEL 요약 체인으로 3~5문장, 4개 단위 경계로 캐시, `src/memory.py`), PII 마스킹, 도구 호출 내역 저장·복원(`_trace_of`·`_history_messages`), Bedrock 스로틀링 재시도(`bedrock_client_config`).
+- **Day 5: 미들웨어(직접 구현)** — **대화 이력 요약**(최근 10개는 원문, 이전은 LCEL 요약 체인으로 3~5문장, 4개 단위 경계로 캐시, `src/memory.py`), PII 마스킹, 도구 호출 내역 저장·복원(`_trace_of`·`_history_messages`), **Bedrock 쓰로틀링 재시도**: `.env`의 `BEDROCK_MAX_RETRIES`번(첫 시도 제외)까지 다시 시도한다. 요청 단계의 쓰로틀링은 boto3 standard 모드가(`bedrock_client_config`), 스트림이 열린 뒤에 오는 쓰로틀링은 boto3가 재시도하지 않아 `_stream_reply`가 1·2·4·8초 간격으로 처음부터 다시 받는다. 다 쓰고도 실패하면 "잠시 뒤 다시 시도해 주세요"라고 안내한다.
 - **Day 7: Plan-Execute(경량)** — LLM이 변경 묶음을 **계획**하고, 코드가 단일 설정 → 물건 추가·수정·삭제 → 장면 동작 순서로 **실행**한다. 결과와 점검 결과를 LLM에 돌려 마무리 답변을 쓰게 한다.
 - **Day 7: Observability** — LangSmith 트레이싱(`LANGSMITH_*`). 예: 질문 1건 2.97초·12.53K 토큰·$0.0139, LLM 호출 2번. 화면: [docs/langsmith-trace.webp](docs/langsmith-trace.webp). 앱 안에도 "셋업 읽기 → 생각하기 → 도구 실행" 진행 단계를 보여 준다.
 - **Day 7: 평가** — 인-아웃 세트를 실제 Bedrock 에이전트에 반복 실행하는 러너(`src/evaluate.py`). 규칙 채점이 기본, 범위 밖 5건만 LLM-as-Judge. 인프라 오류(쓰로틀링)는 재시도하고 분모에서 분리한다. 검색은 따로 질의 20개로 hit@k·MRR을 잰다(`src/rag_eval.py`).
@@ -83,7 +83,7 @@ flowchart LR
 │  └─ static/index.html   3D 시뮬레이터 + 채팅 패널
 ├─ data/              가이드 문서 6개
 ├─ evaluation/        test_queries.csv, round1/round2_report.md, rag_queries.json, fixture.json, reports/
-├─ tests/             Bedrock 없이 도는 테스트 179개
+├─ tests/             Bedrock 없이 도는 테스트 188개
 ├─ SERVICE.md · README.md · requirements.txt · Dockerfile · docker-compose.yml · run.sh
 ```
 
@@ -98,7 +98,7 @@ docker build -t desk-simulator .
 docker run --rm -p 8000:8000 --env-file .env desk-simulator   # 또는 docker compose up --build
 ```
 ```bash
-python -m pytest tests               # 테스트 179개(가짜 LLM·가짜 임베딩, Bedrock 불필요)
+python -m pytest tests               # 테스트 188개(가짜 LLM·가짜 임베딩, Bedrock 불필요)
 python -m src.evaluate               # 인-아웃 평가: 실제 Bedrock, 35건 × 3회 → evaluation/reports/latest.md
 python -m src.rag_eval               # 검색 평가: 질의 20개 → evaluation/reports/rag_latest.md
 ```
@@ -151,7 +151,7 @@ python -m src.rag_eval               # 검색 평가: 질의 20개 → evaluatio
 - **범위 밖 차단을 코드로 옮긴 뒤에는 평가를 다시 돌리지 않았다.** 위 수치(범위 밖 15/15)는 프롬프트 규칙만으로 거절하던 때의 측정값이다. 지금은 `out_*` 5건이 모두 LLM을 거치지 않고 고정 안내로 답하며(`test_eval_set_out_cases_are_blocked_and_in_cases_pass`), 정상·guardrail 30건은 하나도 막지 않는다는 것만 테스트로 확인했다.
 - 평가 기준을 한 번 보정했다(`gr_missing_number`의 답변 키워드 추가). LLM 판정은 5건뿐이고 판정 모델 = 답변 모델이라 편향 가능성이 있다.
 - 승인 **뒤** 실제 적용은 브라우저가 하므로 평가하지 못한다(합성한 결과로 흐름만 확인). 대화 요약 미들웨어도 평가 세트의 대화가 짧아 이 평가로는 재지 않는다(테스트·수동 확인만).
-- 자동 테스트 179개(통과)는 검증 로직, 가드레일, 요약, 도구 루프, 승인·거절, 번호 체계, 기록 복원, 완료 주장 안전장치, 검색, 상품 검색, 판정 체인, 평가 러너 채점을 가짜 LLM으로 확인한다. 실제 LLM의 판단은 위 평가로 본다.
+- 자동 테스트 188개(통과)는 검증 로직, 가드레일, 요약, 도구 루프, 승인·거절, 번호 체계, 기록 복원, 완료 주장 안전장치, 쓰로틀링 재시도, 검색, 상품 검색, 판정 체인, 평가 러너 채점을 가짜 LLM으로 확인한다. 실제 LLM의 판단은 위 평가로 본다.
 
 ## 트라이앤에러 회고
 **시도했지만 실패한 접근 · 왜 실패했는가**
@@ -183,19 +183,21 @@ python -m src.rag_eval               # 검색 평가: 질의 20개 → evaluatio
 - 대화 요약은 LLM이 하므로 사실을 틀리게 옮길 수 있다(요약 머리말에 "적용 여부는 도구 결과로 판단"을 명시).
 - 장기 메모리가 없다(새로고침하면 대화가 사라짐). 인증이 없어 로컬 단독 사용만 전제하고, 승인 대기 중 창을 닫으면 서버 메모리에 상태가 남는다.
 - 질문 1건당 비용이 작지 않다(도구 1회에 LLM 2번, 약 12.5K 토큰, 약 $0.014) → 스키마·상태 요약 축소, 프롬프트 캐싱 검토.
+- 쓰로틀링 재시도는 답변 글이 화면에 나가기 전까지만 한다. 글이 일부 나간 뒤 끊기면(글이 겹치므로) 다시 받지 않고 오류로 끝난다. 실제 Bedrock 쓰로틀링으로는 확인하지 못했고 가짜 LLM 테스트로만 확인했다.
 - 모호한 요청은 여전히 오해할 수 있고 모델이 가끔 도구 없이 답한다.
 
 ## 핵심 코드 위치
-- `src/agent.py:387` — 메인 에이전트 그래프 `build_graph`. 노드 `context:396`·`shield:424`·`agent:429`·`act:444`·`route:483`. 시스템 프롬프트 `SYSTEM_PROMPT:57`, 도구 스키마 `ListSettings:96`·`SearchGuides:105`·`SearchProducts:111`·`ProposeChanges:134`·`SceneAction:142`·`SetView:150`
-- `src/agent.py:269` — 승인 카드 `_ask_approval`, 제안 처리 `_propose:281`, 장면 동작 `_scene_action:312`, 화면 보기 `_set_view:319`, 가이드 검색 `_search_guides:338`, 상품 검색 `_search_products:375`, 요약 `default_summarizer:353`
-- `src/agent.py:219` — 기록 복원 `_history_messages`, 도구 기록 `_trace_of:237`, 완료 주장 `CLAIM:215`, 취소 뒤 재제안 차단 `REJECTED_TEXT:211`, 기본 그래프 `build_default_graph:503`, 스트리밍 `ask_stream:535`·`resume_stream:543`
+- `src/agent.py:418` — 메인 에이전트 그래프 `build_graph`. 노드 `context:428`·`shield:456`·`agent:461`·`act:476`·`route:515`. 시스템 프롬프트 `SYSTEM_PROMPT:58`, 도구 스키마 `ListSettings:97`·`SearchGuides:106`·`SearchProducts:112`·`ProposeChanges:135`·`SceneAction:143`·`SetView:151`
+- `src/agent.py:300` — 승인 카드 `_ask_approval`, 제안 처리 `_propose:312`, 장면 동작 `_scene_action:343`, 화면 보기 `_set_view:350`, 가이드 검색 `_search_guides:369`, 상품 검색 `_search_products:406`, 요약 `default_summarizer:384`
+- `src/agent.py:250` — 기록 복원 `_history_messages`, 도구 기록 `_trace_of:268`, 완료 주장 `CLAIM:246`, 취소 뒤 재제안 차단 `REJECTED_TEXT:242`, 기본 그래프 `build_default_graph:535`, 스트리밍 `ask_stream:567`·`resume_stream:575`
+- `src/agent.py:213` — 답변 스트리밍과 응답 도중 쓰로틀링 재시도 `_stream_reply`, boto3 재시도 설정 `src/config.py:52` `bedrock_client_config`
 - `src/tools.py:53` — 도메인 도구(상품 검색): 검색 대상 `target_from_state`, 상품명 치수 읽기 `parse_dims:118`, 일치 판정 `match:134`, 검색 `search:174`, 결과 글 `format_result:212`
 - `src/retriever.py:141` — RAG 파이프라인: `HybridRetriever`, 쿼리 확장 `expand_query:66`, 조각 나누기 `load_chunks:76`, `BM25:103`, 융합 `rrf:130`, 결과 글 `format_hits:196`, 구성 `build_retriever:204`
 - `src/settings.py:67` — 값 검증 `validate_patch`, `validate_ops:143`, `validate_scene_action:203`, 전후 비교 `diff_items:125`
 - `src/guard.py:83` — PII 마스킹 `redact`, 인젝션 판별 `looks_like_injection:96`, 범위 밖 판별 `looks_off_topic:101`
 - `src/memory.py:34` — 요약 구간 `plan`, 캐시 `cached:58`·`store:66`
 - `src/context.py:29` — 상태를 LLM 글로 바꾸는 `describe`, 직접 바꾼 것 `describe_changes:103`
-- `src/app.py:113` — `chat_stream`, 승인 `chat_approve:125`
+- `src/app.py:117` — `chat_stream`, 승인 `chat_approve:128`
 - `src/evaluate.py:54` — 평가 러너: `load_cases`, 채점 `check_run:129`, 판정 체인 `judge_chain:218`, 재시도 `run_case:272`, 집계 `summarize_runs:312`, 보고서 `render_report:344`
 - `src/rag_eval.py:30` — 검색 평가 `score_queries`(hit@k·MRR)
 - `src/static/index.html` — 3D 시뮬레이터, `window.deskSim` 에이전트 API, 채팅 패널

@@ -48,7 +48,7 @@
 실제 개인 데이터·결제·계정은 다루지 않는다.
 
 ## 4. 서비스 정책 (가드레일 요약)
-어떤 경우에도 지킬 규칙 5가지. 세부 케이스는 ① 자동 테스트(`tests/`, 가짜 LLM, 179개)와 ② [`evaluation/test_queries.csv`](evaluation/test_queries.csv)의 guardrail(`gr_*`)·범위 밖(`out_*`) 항목(실제 Bedrock, 35건 × 3회, 결과는 [round2_report.md](evaluation/round2_report.md))에서 검증한다.
+어떤 경우에도 지킬 규칙 5가지. 세부 케이스는 ① 자동 테스트(`tests/`, 가짜 LLM, 188개)와 ② [`evaluation/test_queries.csv`](evaluation/test_queries.csv)의 guardrail(`gr_*`)·범위 밖(`out_*`) 항목(실제 Bedrock, 35건 × 3회, 결과는 [round2_report.md](evaluation/round2_report.md))에서 검증한다.
 
 | # | 규칙 | 어떻게 지키나 | 검증 |
 |---|---|---|---|
@@ -72,7 +72,7 @@
 ### 완성으로 볼 최소 기준
 | 항목 | 목표 | 현재 |
 |---|---|---|
-| 자동 테스트 | 100% | **179 / 179** ✅ |
+| 자동 테스트 | 100% | **188 / 188** ✅ |
 | 인-아웃 세트(35건 × 3회) 통과율 | **90% 이상** | **103 / 105 (98%)**, 케이스 단위 34/35 ✅ (낙관적) |
 | guardrail 통과 | **100%** | **15 / 15** ✅ (불안정: 한때 14/15) |
 | 가이드 검색 hit@3 | 90% 이상 | **20 / 20**, MRR 1.000 ✅ (낙관적) |

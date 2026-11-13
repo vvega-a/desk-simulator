@@ -50,5 +50,9 @@ def load_settings() -> dict:
 
 
 def bedrock_client_config(max_retries: int) -> Config:
-    """boto3 클라이언트용 재시도 설정. standard 모드는 스로틀링 오류를 백오프 후 다시 시도한다(첫 시도는 제외)."""
+    """boto3 클라이언트용 재시도 설정. standard 모드는 쓰로틀링 오류를 백오프 후 다시 시도한다.
+
+    클라이언트 설정의 max_attempts는 첫 시도를 뺀 '재시도 횟수'다(BEDROCK_MAX_RETRIES=3이면 첫 시도 + 재시도 3번).
+    스트림이 열린 뒤에 오는 쓰로틀링은 boto3가 재시도하지 않아 src/agent.py의 _stream_reply가 같은 횟수로 다시 받는다.
+    """
     return Config(retries={"max_attempts": max_retries, "mode": "standard"})

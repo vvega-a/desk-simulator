@@ -29,6 +29,7 @@
 """
 import re
 import threading
+import time
 import uuid
 from typing import Annotated, Any, Literal, TypedDict
 
@@ -190,17 +191,47 @@ def _text_of(chunk) -> str:
 _BOUNDARY = re.compile(r"[.!?]\s|\n")
 
 
-def _stream_reply(llm, messages: list) -> AIMessage:
-    """LLM 응답을 문장이 끝날 때마다 token 이벤트로 내보내고, 도구 호출까지 합친 AIMessage를 돌려준다."""
-    full, buf = None, ""
-    stream = llm.stream(messages) if hasattr(llm, "stream") else [llm.invoke(messages)]
-    for chunk in stream:
-        full = chunk if full is None else full + chunk
-        buf += _text_of(chunk)
-        while (m := _BOUNDARY.search(buf)):
-            segment, buf = buf[: m.end()], buf[m.end():]
-            if segment.strip():
-                _emit({"type": "token", "text": guard.redact(segment)})  # 출력 가드: LLM이 개인정보를 말해도 가린다
+RETRY_BASE_WAIT, RETRY_MAX_WAIT = 1.0, 8.0  # 응답 도중 쓰로틀링 재시도 대기(초): 1, 2, 4, 8, 8 …
+_sleep = time.sleep
+
+
+def _is_stream_throttle(error: BaseException | None) -> bool:
+    """응답을 받는 도중(스트림 이벤트)에 온 쓰로틀링인가.
+
+    요청을 보낼 때의 쓰로틀링(ThrottlingException)은 boto3가 BEDROCK_MAX_RETRIES번 이미 재시도했으므로 여기서 또 하지 않는다.
+    스트림이 열린 뒤에 오는 쓰로틀링(EventStreamError)은 boto3가 재시도하지 않아서 직접 다시 시도한다.
+    """
+    for _ in range(5):  # 감싸진 예외까지 본다
+        if error is None:
+            return False
+        if type(error).__name__ == "EventStreamError" and "throttl" in str(error).lower():
+            return True
+        error = error.__cause__ or error.__context__
+    return False
+
+
+def _stream_reply(llm, messages: list, max_retries: int = 0) -> AIMessage:
+    """LLM 응답을 문장이 끝날 때마다 token 이벤트로 내보내고, 도구 호출까지 합친 AIMessage를 돌려준다.
+
+    응답 도중 쓰로틀링이 나면 max_retries번까지 처음부터 다시 받는다. 이미 화면에 내보낸 글이 있으면 겹치므로 다시 받지 않는다.
+    """
+    for attempt in range(max_retries + 1):
+        full, buf, emitted = None, "", False
+        try:
+            stream = llm.stream(messages) if hasattr(llm, "stream") else [llm.invoke(messages)]
+            for chunk in stream:
+                full = chunk if full is None else full + chunk
+                buf += _text_of(chunk)
+                while (m := _BOUNDARY.search(buf)):
+                    segment, buf = buf[: m.end()], buf[m.end():]
+                    if segment.strip():
+                        emitted = True
+                        _emit({"type": "token", "text": guard.redact(segment)})  # 출력 가드: LLM이 개인정보를 말해도 가린다
+            break
+        except Exception as e:
+            if emitted or attempt >= max_retries or not _is_stream_throttle(e):
+                raise
+            _sleep(min(RETRY_BASE_WAIT * 2 ** attempt, RETRY_MAX_WAIT))
     if buf.strip():
         _emit({"type": "token", "text": guard.redact(buf)})
     # 본문은 문자열로만 보관한다. 도구 호출은 tool_calls로 따로 들고 있어 다시 보낼 때 중복되지 않는다
@@ -384,11 +415,12 @@ def _search_products(state: AgentState, args: dict, shop_keys: tuple[str, str]) 
     return shop.format_result(r)
 
 
-def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", shop_keys=("", "")):
+def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", shop_keys=("", ""), max_retries=0):
     """llm: ChatBedrockConverse 호환(bind_tools와 stream을 가진 객체). checkpointer는 interrupt에 필요해서 기본으로 메모리를 쓴다.
     retriever: 가이드 문서 검색기(src.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다.
     summarizer: 오래된 대화 요약 Runnable({conversation} → 글). 기본은 llm으로 만든 LCEL 체인, None이면 요약하지 않는다.
-    shop_keys: 네이버 검색 API (Client ID, Client Secret). 비어 있으면 상품 검색은 검색 링크만 돌려준다."""
+    shop_keys: 네이버 검색 API (Client ID, Client Secret). 비어 있으면 상품 검색은 검색 링크만 돌려준다.
+    max_retries: 응답 도중 쓰로틀링이 났을 때 다시 받는 횟수(BEDROCK_MAX_RETRIES). 요청 단계의 쓰로틀링은 llm의 boto3 설정이 같은 횟수로 재시도한다."""
     tool_llm = llm.bind_tools([ListSettings, SearchGuides, SearchProducts, ProposeChanges, SceneAction, SetView])
     if summarizer == "default":
         summarizer = default_summarizer(llm)
@@ -428,7 +460,7 @@ def build_graph(llm, checkpointer=None, retriever=None, summarizer="default", sh
 
     def agent(state: AgentState) -> AgentState:
         _emit({"type": "step", "phase": "start", "node": "agent", "label": STEP_LABELS["agent"]})
-        reply = _stream_reply(tool_llm, state["messages"])
+        reply = _stream_reply(tool_llm, state["messages"], max_retries)
         names = ", ".join(c["name"] for c in reply.tool_calls)
         _step_done("agent", f"도구를 골랐어요: {names}" if reply.tool_calls else "답변을 마쳤어요")
         out: dict = {"messages": [reply], "loops": state.get("loops", 0) + 1}
@@ -514,7 +546,7 @@ def build_default_graph():
     retriever = build_retriever(s["embed_model_id"], s["region"], retry)
     # 문서 조각 임베딩(약 5초)을 미리 해 둬 첫 검색이 느리지 않게 한다. 실패하면 키워드 검색만으로 계속한다
     threading.Thread(target=retriever.warm_up, daemon=True).start()
-    return build_graph(llm, retriever=retriever, shop_keys=(s["naver_client_id"], s["naver_client_secret"]))
+    return build_graph(llm, retriever=retriever, shop_keys=(s["naver_client_id"], s["naver_client_secret"]), max_retries=s["max_retries"])
 
 
 def _run(graph, payload, thread_id: str):

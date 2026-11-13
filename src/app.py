@@ -98,6 +98,9 @@ def _relay(events):
             else:
                 yield _sse(event)
     except Exception as e:
+        if "throttl" in f"{type(e).__name__} {e}".lower():  # 재시도(BEDROCK_MAX_RETRIES번)를 다 쓰고도 쓰로틀링인 경우
+            yield _sse({"type": "error", "message": "지금 요청이 몰려 답변을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."})
+            return
         # 자격 증명·모델 권한 오류 등. 오류 내용은 노출하지 않고 종류만 알린다
         yield _sse({"type": "error", "message": f"답변을 만들지 못했어요: {type(e).__name__}. .env의 Bedrock 설정을 확인해 주세요."})
 
