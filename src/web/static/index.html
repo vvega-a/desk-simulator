@@ -1182,44 +1182,143 @@ function loop(now){requestAnimationFrame(loop);if(camAnim)camAnim(now);controls.
   for(const w of roomWalls)w.g.visible=camera.position.clone().sub(w.p).dot(w.n)>-1;renderer.render(scene,camera)}
 
 /* ---------- agent API (window.deskSim) ----------
-   채팅 에이전트가 상태를 읽고 바꾸는 유일한 통로. 값은 패널(UI)에 정의된 범위·선택지로 검증한다.
-   배열 항목(추가 책상·서랍장·세트·타공판)은 아직 읽기만 되고 applyPatch로는 못 바꾼다. */
+   채팅 에이전트가 화면의 기능을 쓰는 유일한 통로. 값은 패널(UI)에 정의된 범위·선택지로 검증한다.
+   - 단일 설정: applyPatch / 배열 아이템(추가 책상·서랍장·세트·타공판) 추가·수정·삭제: applyChanges
+   - 장면 전체: 초기화·슬롯 저장/불러오기(applyChanges의 scene_action) / 보기: view·autoRotate */
 const FIELDS={};for(const sec of UI)for(const it of sec.items)FIELDS[it.k]={...it,section:sec.sec};
 const clone=o=>JSON.parse(JSON.stringify(o));
+const VIEWS=['iso','front','top','side','pov'];
 function loadState(c){
   S={...DEFAULTS,...c,extraDesks:(c.extraDesks||[]).map(o=>({...o})),drawers:(c.drawers||[]).map(o=>({...o})),sets:(c.sets||[]).map(o=>({...o})),pegs:(c.pegs||[]).map(o=>({...o}))};
   refreshUI();renderExtra();renderDrawers();renderSets();renderPegs();build();reframe();
 }
-function schema(){
-  return Object.values(FIELDS).map(f=>({key:f.k,label:f.t,section:f.section,type:f.type,min:f.min,max:f.max,step:f.step,unit:f.unit,
-    options:f.opts?f.opts.map(norm).map(o=>({value:o.v,label:o.l})):undefined}));
+const optList=f=>(typeof f.opts==='function'?f.opts():f.opts).map(norm);
+function specOf(f){
+  return {key:f.k,label:f.t,type:f.type,min:f.min,max:f.max,step:f.step,unit:f.unit,
+    options:f.opts?optList(f).map(o=>({value:o.v,label:o.l})):undefined};
+}
+function schema(){return Object.values(FIELDS).map(f=>({...specOf(f),section:f.section}))}
+/* 값 하나를 필드 정의로 검증한다. {v} 또는 {err} */
+function checkValue(f,raw){
+  if(f.type==='range'){
+    const v=Number(raw);
+    if(raw===''||raw===null||typeof raw==='boolean'||!Number.isFinite(v))return{err:'숫자가 아니에요'};
+    return{v:Math.min(f.max,Math.max(f.min,Math.round((v-f.min)/f.step)*f.step+f.min))};
+  }
+  if(f.type==='toggle')return typeof raw==='boolean'?{v:raw}:{err:'true/false여야 해요'};
+  const o=optList(f).find(o=>String(o.v)===String(raw));
+  return o?{v:o.v}:{err:'선택지: '+optList(f).map(o=>o.v).join(', ')};
 }
 function applyPatch(patch){
   const applied={},rejected={};
   const keys=Object.keys(patch||{}).sort((a,b)=>(['mon','mount'].includes(b)?1:0)-(['mon','mount'].includes(a)?1:0)); // mon·mount는 다른 값을 바꾸므로 먼저 적용
   for(const k of keys){
-    const f=FIELDS[k],raw=patch[k];let v=raw;
+    const f=FIELDS[k];
     if(!f){rejected[k]='알 수 없는 항목이에요';continue}
-    if(f.type==='range'){
-      v=Number(raw);if(raw===''||raw===null||!Number.isFinite(v)){rejected[k]='숫자가 아니에요';continue}
-      v=Math.min(f.max,Math.max(f.min,Math.round((v-f.min)/f.step)*f.step+f.min));
-    }else if(f.type==='toggle'){
-      if(typeof raw!=='boolean'){rejected[k]='true/false여야 해요';continue}
-    }else{
-      const o=f.opts.map(norm).find(o=>String(o.v)===String(raw));
-      if(!o){rejected[k]='선택지: '+f.opts.map(norm).map(o=>o.v).join(', ');continue}
-      v=o.v;
-    }
-    set(k,v);applied[k]=S[k];
+    const r=checkValue(f,patch[k]);
+    if(r.err){rejected[k]=r.err;continue}
+    set(k,r.v);applied[k]=S[k];
   }
   flush(); // 바로 getChecks()로 새 점검 결과를 읽을 수 있게
   return {applied,rejected};
 }
+
+/* 배열 아이템: 어떤 값을 가질 수 있는지(패널의 편집기와 같은 항목) */
+const rangeField=f=>({...f,type:'range',unit:f.unit||'mm'});
+const deskOpts=()=>[0,...S.extraDesks.map((_,i)=>i+1)].map(v=>({v,l:v?`책상 ${v+1}`:'메인 책상'}));
+const COLS={
+  extraDesks:{label:'추가 책상',fields:[{k:'place',t:'위치',type:'select',opts:PLACES},...XF.map(rangeField)]},
+  drawers:{label:'서랍장',fields:[{k:'where',t:'위치',type:'select',opts:WHERE},...DF.map(rangeField),
+    {k:'tiers',t:'서랍 칸 수',type:'range',min:1,max:6,step:1,unit:'단'},{k:'casters',t:'바퀴',type:'toggle'},{k:'color',t:'색',type:'select',opts:DESK_COLORS}]},
+  sets:{label:'모니터+노트북 세트',fields:[{k:'desk',t:'놓을 책상 (0=메인, 1부터=추가 책상 순서)',type:'select',opts:deskOpts},
+    {k:'mon',t:'모니터',type:'select',opts:Object.entries(MONITORS).map(([v,m])=>({v,l:m.label}))},
+    {k:'lap',t:'노트북도 같이 걸기',type:'toggle'},{k:'side',t:'노트북 위치',type:'select',opts:[{v:'left',l:'왼쪽'},{v:'right',l:'오른쪽'}]},
+    {k:'size',t:'노트북 크기',type:'select',opts:['13','14','16'].map(v=>({v,l:v+'"'}))},{k:'kb',t:'키보드·마우스',type:'toggle'},...SF.map(rangeField)]},
+  pegs:{label:'타공판',fields:[{k:'desk',t:'놓을 책상 (0=메인, 1부터=추가 책상 순서)',type:'select',opts:deskOpts},{k:'color',t:'색',type:'select',opts:PEG_COLORS},
+    {k:'mount',t:'설치 방식',type:'select',opts:[{v:'clamp',l:'책상 클램프'},{v:'easel',l:'책상 위 (뒷다리)'},{v:'floor',l:'바닥 스탠드'},{v:'wall',l:'벽 부착'}]},
+    {k:'acc',t:'선반·후크 등 액세서리',type:'toggle'},...PF.map(rangeField)]},
+};
+function collections(){
+  const out={};
+  for(const a of ARR)out[a.key]={label:COLS[a.key].label,max:a.max,first:a.first,fields:COLS[a.key].fields.map(specOf)};
+  return out;
+}
+const REND={extraDesks:()=>renderExtra(),drawers:()=>renderDrawers(),sets:()=>renderSets(),pegs:()=>renderPegs()};
+// 패널에서 같은 값을 골랐을 때 일어나는 연쇄 변경을 그대로 따른다
+function afterSet(col,k,e){
+  if(col==='extraDesks'&&k==='place'&&e.place.startsWith('front')){e.gap=0;e.shift=0;if(e.w>1200)e.w=800;if(e.d>600)e.d=500}
+  if(col==='drawers'&&k==='where'){e.x=0;e.z=0;
+    if(e.where.startsWith('FL')){e.h=Math.min(e.h,S.deskH);e.casters=false}
+    if(e.where[0]==='L'&&e.w<S.deskD){e.w=Math.min(1200,S.deskD+200);e.h=Math.min(e.h,S.deskH);e.casters=false;e.tiers=Math.max(e.tiers,2)}}
+  if(col==='sets'&&k==='desk')e.x=0;
+  if(col==='pegs'&&k==='desk'){e.x=0;e.w=Math.min(e.w,deskCtx(e.desk).w)}
+  if(col==='pegs'&&k==='mount'&&e.mount==='floor'&&S.room&&e.desk===0&&S.roomGap<200){S.roomGap=200;refreshUI()}
+}
+/* 한 아이템의 값을 검증해 넣는다. 거절된 값은 사유 글로 돌려준다 */
+function setFields(col,i,values){
+  const specs=Object.fromEntries(COLS[col].fields.map(f=>[f.k,f])),e=S[col][i],bad=[];
+  const keys=Object.keys(values||{}).sort((a,b)=>(specs[a]&&specs[a].type==='range'?1:0)-(specs[b]&&specs[b].type==='range'?1:0)); // 위치 같은 선택지를 먼저, 숫자는 나중에 덮어쓴다
+  for(const k of keys){
+    const f=specs[k];
+    if(!f){bad.push(`${k}: 알 수 없는 항목이에요`);continue}
+    const r=checkValue(f,values[k]);
+    if(r.err){bad.push(`${k}: ${r.err}`);continue}
+    e[k]=r.v;afterSet(col,k,e);
+  }
+  REND[col]();schedule();
+  return bad;
+}
+const okOp=text=>({ok:true,text}),failOp=text=>({ok:false,text});
+function runOp(op){
+  const a=ARR.find(a=>a.key===op.collection);
+  if(!a)return failOp('알 수 없는 종류: '+op.collection);
+  const L=S[a.key],n=i=>`${a.label} ${i+a.first}`;
+  const bad=b=>b.length?` (일부 값은 거절: ${b.join('; ')})`:'';
+  if(op.op==='add'){
+    if(L.length>=a.max)return failOp(`${a.label}은(는) 최대 ${a.max}개예요`);
+    const before=L.length;const btn=$(a.addBtn);if(btn)btn.click();   // 기본값은 패널의 추가 버튼과 같다
+    if(L.length===before)return failOp(`${a.label}을(를) 추가하지 못했어요`);
+    const i=L.length-1;return okOp(`${n(i)} 추가`+bad(setFields(a.key,i,op.values)));
+  }
+  const i=Number(op.index);
+  if(!Number.isInteger(i)||i<0||i>=L.length)return failOp(`${a.label} 번호가 맞지 않아요(0~${L.length-1})`);
+  if(op.op==='update')return okOp(`${n(i)} 수정`+bad(setFields(a.key,i,op.values)));
+  if(op.op==='remove'){
+    const name=n(i),x=document.getElementById(a.box).querySelectorAll(':scope > .xd')[i];
+    if(x)x.querySelector('.del').click();
+    return okOp(`${name} 삭제`);
+  }
+  return failOp('알 수 없는 작업: '+op.op);
+}
+function runAction(a){
+  const slots=getSlots();
+  if(a.action==='reset'){loadState({});return okOp('모든 설정을 처음 상태로 되돌렸어요')}
+  if(!['A','B','C'].includes(a.slot))return failOp('슬롯은 A, B, C 중 하나예요');
+  if(a.action==='load_slot'){
+    if(!slots[a.slot])return failOp(`슬롯 ${a.slot}는 비어 있어요`);
+    loadState(slots[a.slot]);return okOp(`슬롯 ${a.slot}를 불러왔어요`);
+  }
+  if(a.action==='save_slot'){putSlots({...slots,[a.slot]:clone(S)});renderSlots();return okOp(`슬롯 ${a.slot}에 저장했어요`)}
+  return failOp('알 수 없는 동작: '+a.action);
+}
+/* 승인된 변경 묶음을 적용한다: {changes, array_ops, scene_action}. 단일 설정 → 배열 작업 → 장면 동작 순서 */
+function applyChanges(spec){
+  const res={applied:{},rejected:{},ops:[]};
+  if(spec&&spec.changes){const r=applyPatch(spec.changes);res.applied=r.applied;res.rejected=r.rejected}
+  for(const op of (spec&&spec.array_ops)||[])res.ops.push(runOp(op));
+  if(spec&&spec.scene_action)res.ops.push(runAction(spec.scene_action));
+  flush();
+  return res;
+}
+function slotInfo(){const s=getSlots();return Object.fromEntries(['A','B','C'].map(k=>[k,s[k]?summary(s[k]):null]))}
 window.deskSim={
   getState:()=>clone(S),
   getChecks:()=>clone(lastChecks),
-  schema,applyPatch,loadState,
+  schema,collections,slots:slotInfo,
+  applyPatch,applyChanges,loadState,
   reset:()=>loadState({}),
+  view:name=>{if(!VIEWS.includes(name))return false;setView(name);return true},
+  autoRotate:on=>setAuto(!!on),
 };
 
 renderPanel();renderExtra();renderDrawers();renderSets();renderPegs();refreshUI();renderSlots();build();setView('iso',true);resize();setAuto(true);requestAnimationFrame(loop);
@@ -1231,7 +1330,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>build());
 (function(){
 const $=s=>document.querySelector(s);
 const app=document.querySelector('.app'),msgs=$('#msgs'),input=$('#chatInput'),sendBtn=$('#chatSend'),toggle=$('#chatToggle');
-const STARTERS=['지금 내 셋업 괜찮아?','눈이랑 화면 거리는 적당해?','모니터를 32인치로 바꿔줘'];
+const STARTERS=['지금 내 셋업 괜찮아?','서랍장 하나 추가해줘','정면에서 보여줘'];
 const history=[];let busy=false;
 
 function setOpen(open){app.classList.toggle('chat-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.textContent=open?'AI 채팅 닫기':'AI 채팅';
@@ -1244,7 +1343,7 @@ function setBusy(b){busy=b;sendBtn.disabled=b;input.disabled=b;if(!b)input.focus
 
 let turn=null; // 지금 진행 중인 한 번의 질문: {q, text, failed}. 승인을 기다리며 요청이 둘로 나뉘어도 한 턴으로 기록한다
 function finishTurn(){
-  if(turn&&!turn.failed&&turn.text)history.push({role:'user',content:turn.q},{role:'assistant',content:turn.text});
+  if(turn&&!turn.failed&&turn.text)history.push({role:'user',content:turn.q},{role:'assistant',content:turn.text,tools:turn.tools||[]}); // 도구 호출 내역도 같이 남긴다
   turn=null;setBusy(false);
 }
 async function send(question){
@@ -1253,22 +1352,23 @@ async function send(question){
   $('#starters').hidden=true;
   add('msg user',question);input.value='';input.style.height='auto';setBusy(true);
   turn={q:question,text:'',failed:false};
-  const ap=await run('/api/chat/stream',{question,history:history.slice(-10),state:deskSim.getState(),checks:deskSim.getChecks(),settings_schema:deskSim.schema()});
+  const ap=await run('/api/chat/stream',{question,history:history.slice(-10),state:deskSim.getState(),checks:deskSim.getChecks(),settings_schema:deskSim.schema(),collections:deskSim.collections(),slots:deskSim.slots()});
   ap?showApproval(ap):finishTurn();
 }
 function showApproval(ev){
   const card=document.createElement('div');card.className='approval';card.setAttribute('role','group');card.setAttribute('aria-label','설정 변경 승인');
-  const li=ev.changes.map(c=>`<li><span>${esc(c.label)}</span><span>${esc(c.from)} → ${esc(c.to)}</span></li>`).join('');
+  const li=ev.changes.map(c=>`<li><span>${esc(c.label)}</span><span>${c.from?esc(c.from)+' → ':''}${esc(c.to)}</span></li>`).join('');
   const extra=[...Object.values(ev.notes||{}),...Object.entries(ev.rejected||{}).map(([k,v])=>k+': '+v)];
   card.innerHTML=`<b>설정을 이렇게 바꿀까요?</b>${ev.reason?`<p class="why">${esc(ev.reason)}</p>`:''}<ul>${li}</ul>${extra.length?`<p class="warn">${extra.map(esc).join('<br>')}</p>`:''}<div class="btns"><button type="button" class="ok">적용하기</button><button type="button" class="no">취소</button></div>`;
   msgs.appendChild(card);msgs.scrollTop=msgs.scrollHeight;
   card.querySelector('.ok').focus();
   const decide=async approve=>{
     const before=deskSim.getState();
-    const result=approve?deskSim.applyPatch(ev.patch):{};
+    const result=approve?deskSim.applyChanges(ev.patch):{};
     const box=card.querySelector('.btns');
+    const okN=Object.keys(result.applied||{}).length+(result.ops||[]).filter(o=>o.ok).length,failN=(result.ops||[]).filter(o=>!o.ok).length+Object.keys(result.rejected||{}).length;
     box.outerHTML=approve
-      ?`<div class="done"><span>적용했어요 (${Object.keys(result.applied||{}).length}개)</span><button type="button" class="undo">되돌리기</button></div>`
+      ?`<div class="done"><span>적용했어요 (${okN}개${failN?`, 실패 ${failN}개`:''})</span><button type="button" class="undo">되돌리기</button></div>`
       :'<div class="done"><span>취소했어요</span></div>';
     const undo=card.querySelector('.undo');
     if(undo)undo.addEventListener('click',()=>{deskSim.loadState(before);undo.parentNode.innerHTML='<span>되돌렸어요</span>'});
@@ -1301,7 +1401,9 @@ async function run(url,body){
           else if(gap&&!/\s$/.test(bubble.textContent))t='\n'+t; // 도구를 거치며 끊긴 앞뒤 문장이 붙지 않게
           gap=false;turn.text+=t;bubble.textContent+=t;msgs.scrollTop=msgs.scrollHeight}
         else if(ev.type==='approval'){approval=ev}
-        else if(ev.type==='done'){if(!bubble&&ev.message){add('msg ai',ev.message);turn.text+=(turn.text?'\n':'')+ev.message}}
+        else if(ev.type==='client_action'){ // 승인이 필요 없는 화면 보기 변경
+          if(ev.action==='set_view'){if(ev.view)deskSim.view(ev.view);if(typeof ev.auto_rotate==='boolean')deskSim.autoRotate(ev.auto_rotate)}}
+        else if(ev.type==='done'){turn.tools=ev.tools||[];if(!bubble&&ev.message){add('msg ai',ev.message);turn.text+=(turn.text?'\n':'')+ev.message}}
         else if(ev.type==='error'){turn.failed=true;add('msg err',ev.message)}
       }
     }
@@ -1315,7 +1417,7 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(120,input.scrollHeight)+'px'});
 $('#starters').innerHTML=STARTERS.map(t=>`<button type="button">${t}</button>`).join('');
 $('#starters').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>send(b.textContent)));
-add('msg ai','안녕하세요! 지금 꾸며 둔 책상 셋업을 보고 평가하고 조언해 드려요. "책상 가로를 1600으로 해줘"처럼 말하면 바꿀 내용을 보여 드리고, 승인하면 적용해요.');
+add('msg ai','안녕하세요! 지금 꾸며 둔 셋업을 보고 조언하고, 화면의 기능을 대신 써 드려요. 설정 바꾸기, 서랍장·타공판·보조 모니터 추가, 슬롯 저장·불러오기, 시점 바꾸기까지 말로 시키세요. 바뀌는 내용은 먼저 보여 드리고, 승인하면 적용해요.');
 setOpen(matchMedia('(min-width:1200px)').matches);
 })();
 </script>

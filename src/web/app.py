@@ -3,11 +3,11 @@
   GET  /                  시뮬레이터 화면(static/index.html)
   GET  /api/health        상태 확인
   POST /api/chat/stream   질문을 SSE로 보내 진행 단계(step)와 답변 조각(token)을 실시간으로 받는다.
-                          본문: {question, history, state, checks, settings_schema} — 브라우저의
-                          window.deskSim.getState()/getChecks()/schema() 값. 서버는 상태를 보관하지 않는다.
+                          본문: {question, history, state, checks, settings_schema, collections, slots} — 브라우저의
+                          window.deskSim.getState()/getChecks()/schema()/collections()/slots() 값. 서버는 상태를 보관하지 않는다.
                           끝은 {type: done, message}, {type: error, message}, 또는 승인 대기 {type: approval, thread_id, ...}.
   POST /api/chat/approve  승인 대기 중인 설정 변경에 대한 사용자의 결정을 받아 이어서 진행한다(SSE).
-                          본문: {thread_id, approve, result?, checks?} — result는 브라우저가 applyPatch로 적용한 결과,
+                          본문: {thread_id, approve, result?, checks?} — result는 브라우저가 applyChanges로 적용한 결과,
                           checks는 적용 뒤 점검 결과.
 """
 import contextlib
@@ -27,9 +27,18 @@ STATIC_DIR = Path(__file__).parent / "static"
 MAX_HISTORY = 10  # 대화 맥락으로 LLM에 넘기는 최근 메시지 수
 
 
+class ToolTrace(BaseModel):
+    """어시스턴트 턴에서 실제로 실행된 도구 호출 하나. 다음 질문에서 호출·결과를 되살리는 데 쓴다."""
+
+    name: str = Field(max_length=40)
+    args: dict = Field(default_factory=dict)
+    result: str = Field(default="", max_length=1000)
+
+
 class HistoryItem(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(max_length=4000)
+    tools: list[ToolTrace] = Field(default_factory=list, max_length=8)
 
 
 class ChatRequest(BaseModel):
@@ -38,6 +47,8 @@ class ChatRequest(BaseModel):
     state: dict = Field(default_factory=dict)
     checks: list[dict] = Field(default_factory=list, max_length=40)
     settings_schema: list[dict] = Field(default_factory=list, max_length=80)
+    collections: dict = Field(default_factory=dict)  # 추가 책상·서랍장 등 배열 물건의 값 정의(deskSim.collections())
+    slots: dict = Field(default_factory=dict)  # 저장 슬롯 요약(deskSim.slots())
 
 
 class ApproveRequest(BaseModel):
@@ -80,7 +91,7 @@ def _relay(events):
     try:
         for event in events:
             if event["type"] == "result":
-                yield _sse({"type": "done", "message": event["answer"]})
+                yield _sse({"type": "done", "message": event["answer"], "tools": event.get("tools", [])})
             else:
                 yield _sse(event)
     except Exception as e:
@@ -101,7 +112,7 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
     history = [h.model_dump() for h in req.history][-MAX_HISTORY:]
 
     def events():
-        yield from agent.ask_stream(get_graph(), req.question, history, req.state, req.checks, req.settings_schema)
+        yield from agent.ask_stream(get_graph(), req.question, history, req.state, req.checks, req.settings_schema, req.collections, req.slots)
 
     return _sse_response(events())
 

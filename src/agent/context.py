@@ -12,13 +12,14 @@ MOUNTS = {"stand": "기본 스탠드", "arm": "모니터암", "armLap": "모니�
 KEYBOARDS = {"none": "없음", "full": "풀배열", "tkl": "텐키리스", "75": "75%", "65": "65%"}
 TOWERS = {"none": "없음", "deskL": "책상 왼쪽", "deskR": "책상 오른쪽", "floor": "바닥"}
 STATUS = {"ok": "좋음", "warn": "주의", "bad": "문제", "info": "참고"}
+COLLECTIONS = {"extraDesks": "추가 책상", "drawers": "서랍장", "sets": "모니터+노트북 세트", "pegs": "타공판"}
 
 
 def _name(table: dict, key) -> str:
     return table.get(str(key), str(key))
 
 
-def describe(state: dict, checks: list[dict]) -> str:
+def describe(state: dict, checks: list[dict], slots: dict | None = None) -> str:
     """현재 셋업을 줄 단위 글로 설명한다. 상태에 없는 키는 건너뛴다."""
     s = state
     lines = []
@@ -46,15 +47,17 @@ def describe(state: dict, checks: list[dict]) -> str:
     lines.append("기타 물건: " + (", ".join(extras) if extras else "없음"))
     if "userH" in s:
         lines.append(f"사용자 키: {s['userH']}cm")
-    counts = [
-        (len(s.get("extraDesks") or []), "추가 책상"), (len(s.get("drawers") or []), "서랍장"),
-        (len(s.get("sets") or []), "모니터+노트북 세트"), (len(s.get("pegs") or []), "타공판"),
-    ]
-    more = [f"{label} {n}개" for n, label in counts if n]
-    if more:
-        lines.append("추가 구성: " + ", ".join(more))
+    for key, label in COLLECTIONS.items():
+        items = s.get(key) or []
+        if not items:
+            continue
+        lines.append(f"{label} {len(items)}개 (번호는 0부터):")
+        for i, e in enumerate(items):
+            lines.append(f"  [{i}] " + ", ".join(f"{k}={v}" for k, v in e.items()))
     if s.get("room"):
         lines.append(f"방: {s.get('roomW')}mm × {s.get('roomD')}mm, 천장 {s.get('roomH')}mm")
+    if slots:
+        lines.append("저장 슬롯: " + " / ".join(f"{k}: {v or '비어 있음'}" for k, v in slots.items()))
     if checks:
         lines.append("\n" + describe_checks(checks))
     return "\n".join(lines)

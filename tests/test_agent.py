@@ -48,9 +48,10 @@ class FakeLLM:
         yield from self.turns.pop(0) if len(self.turns) > 1 else self.turns[0]
 
 
-def run(llm, question="어때?", history=None):
+def run(llm, question="어때?", history=None, collections=None, slots=None, state=None):
     g = agent.build_graph(llm)
-    return g, list(agent.ask_stream(g, question, history or [], STATE, CHECKS, SCHEMA, thread_id="t1"))
+    events = agent.ask_stream(g, question, history or [], state or STATE, CHECKS, SCHEMA, collections, slots, thread_id="t1")
+    return g, list(events)
 
 
 def tool_messages(llm, call_index):
@@ -117,7 +118,7 @@ def test_plain_answer_streams_sentences_without_tools():
     llm = FakeLLM([AIMessageChunk(content="거리가 조금 "), AIMessageChunk(content="가까워요. 뒤로 밀어 보세요.")])
     _, events = run(llm, "괜찮아?")
     assert [e["text"] for e in events if e["type"] == "token"] == ["거리가 조금 가까워요. ", "뒤로 밀어 보세요."]
-    assert events[-1] == {"type": "result", "answer": "거리가 조금 가까워요. 뒤로 밀어 보세요."}
+    assert events[-1] == {"type": "result", "answer": "거리가 조금 가까워요. 뒤로 밀어 보세요.", "tools": []}
     assert "약 620 mm" in llm.calls[0][0].content and llm.calls[0][-1].content == "괜찮아?"
 
 
@@ -143,14 +144,16 @@ def test_propose_pauses_for_approval_then_applies():
     g, events = run(llm)
     approval = events[-1]
     assert approval["type"] == "approval" and approval["thread_id"] == "t1"
-    assert approval["patch"] == {"deskW": 1640}
+    assert approval["patch"] == {"changes": {"deskW": 1640}, "array_ops": []}
     assert approval["changes"] == [{"key": "deskW", "label": "가로 (폭)", "from": "1400mm", "to": "1640mm"}]
     assert approval["reason"] == "넓게 쓰려고" and "deskW" in approval["notes"]
     assert not any(e["type"] == "result" for e in events)  # 승인 전에는 끝나지 않는다
 
     new_checks = [{"title": "좌우 여유", "value": "왼쪽 400", "status": "ok", "note": "충분"}]
     resumed = list(agent.resume_stream(g, "t1", True, {"applied": {"deskW": 1640}, "rejected": {}}, new_checks))
-    assert resumed[-1] == {"type": "result", "answer": "가로를 1640으로 바꿨어요."}
+    assert resumed[-1]["answer"] == "가로를 1640으로 바꿨어요."
+    assert [t["name"] for t in resumed[-1]["tools"]] == ["ListSettings", "ProposeChanges"]  # 실제 실행된 도구 기록
+    assert "적용했어요: deskW=1640" in resumed[-1]["tools"][1]["result"]
     seen = tool_messages(llm, 2)[-1]
     assert "적용했어요: deskW=1640" in seen and "좌우 여유" in seen  # 적용 결과와 새 점검 결과를 LLM이 본다
 
@@ -204,17 +207,17 @@ def test_stream_endpoint_plain_answer(monkeypatch):
     res = _client(monkeypatch, FakeLLM(text("좋아요."))).post("/api/chat/stream", json=BODY)
     assert res.status_code == 200 and res.headers["content-type"].startswith("text/event-stream")
     events = _events(res)
-    assert events[-1] == {"type": "done", "message": "좋아요."} and any(e["type"] == "token" for e in events)
+    assert events[-1] == {"type": "done", "message": "좋아요.", "tools": []} and any(e["type"] == "token" for e in events)
 
 
 def test_stream_then_approve_endpoints(monkeypatch):
     llm = FakeLLM(call("ProposeChanges", {"changes": {"deskW": 1600}, "reason": "넓게"}), text("바꿨어요."))
     client = _client(monkeypatch, llm)
     first = _events(client.post("/api/chat/stream", json=BODY))
-    assert first[-1]["type"] == "approval" and first[-1]["patch"] == {"deskW": 1600}
+    assert first[-1]["type"] == "approval" and first[-1]["patch"] == {"changes": {"deskW": 1600}, "array_ops": []}
     second = _events(client.post("/api/chat/approve", json={
         "thread_id": first[-1]["thread_id"], "approve": True, "result": {"applied": {"deskW": 1600}}, "checks": CHECKS}))
-    assert second[-1] == {"type": "done", "message": "바꿨어요."}
+    assert second[-1]["type"] == "done" and second[-1]["message"] == "바꿨어요." and second[-1]["tools"][0]["name"] == "ProposeChanges"
 
 
 def test_approve_unknown_thread_reports_error_without_details(monkeypatch):
