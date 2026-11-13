@@ -1,6 +1,37 @@
+# --- 비밀·환경 설정 (AWS 키, LangSmith 키 등). 값 없는 예시는 .env.sample만 올린다 ---
 .env
+.env.*
+!.env.sample
+*.pem
+*.key
+*.p12
+credentials
+.aws/
+
+# --- Python ---
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
 .venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- 앱이 만드는 로컬 데이터 ---
 chats/
+*.log
+
+# --- 에디터·OS·도구 로컬 파일 ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+.claude/settings.local.json
+.archify/
