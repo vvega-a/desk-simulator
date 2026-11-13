@@ -41,6 +41,8 @@ def load_settings() -> dict:
             raise ValueError
     except ValueError:
         raise ConfigError("BEDROCK_MAX_RETRIES는 0 이상의 정수여야 해요.") from None
+    # 선택 값: 가이드 문서 검색(RAG)의 임베딩 모델. 비우면 벡터 검색 없이 키워드(BM25) 검색만 한다
+    settings["embed_model_id"] = _env("BEDROCK_EMBED_MODEL_ID")
     return settings
 
 

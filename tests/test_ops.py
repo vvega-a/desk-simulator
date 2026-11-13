@@ -88,6 +88,7 @@ def test_format_settings_lists_collections():
     overview = format_settings(SCHEMA, None, COLLECTIONS)
     assert "collection=drawers" in overview and "최대 4개" in overview
     detail = format_settings(SCHEMA, "서랍장", COLLECTIONS)
+    assert "자동으로 정하니 되묻지 마세요" in detail  # 위치 같은 값을 되묻지 않고 바로 제안하게 안내
     assert "서랍장 1" in detail and "number" in detail and "index" not in detail and "tiers" in detail and "250~1200mm" in detail
     assert "추가 책상" in format_settings(SCHEMA, "없음", COLLECTIONS)
 
@@ -229,10 +230,12 @@ def test_no_notice_for_plain_answers():
 # ---- 번호 통일: 화면·카드·에이전트가 같은 '이름 번호'를 쓴다 ------------------------------------
 
 def test_every_item_is_numbered_the_same_way_everywhere():
-    state = {**STATE, "subCount": 2, "sub": "24", "extraDesks": [{"place": "right", "w": 1000}, {"place": "left", "w": 800}],
-             "drawers": [DRAWER, DRAWER]}
+    state = {**STATE, "monitors": [{"desk": 0, "mon": "24", "mount": "stand"}, {"desk": 0, "mon": "32", "mount": "arm"}],
+             "extraDesks": [{"place": "right", "w": 1000}, {"place": "left", "w": 800}], "drawers": [DRAWER, DRAWER]}
     out = describe(state, [])
-    assert "책상 1: " in out and "모니터 1: " in out and "모니터 2·3: " in out  # 모니터는 메인/보조로 나누지 않고 번호만
+    assert "책상 1: " in out and "모니터 1: " in out  # 모니터는 메인/보조로 나누지 않고 번호만
+    assert "  모니터 2: desk=0, mon=24" in out and "  모니터 3: desk=0, mon=32" in out  # 추가 모니터는 2번부터 이어진다
+    assert "subCount" not in out
     assert "  책상 2: place=right" in out and "  책상 3: place=left" in out  # 추가 책상은 2번부터 이어진다
     assert "  서랍장 1:" in out and "  서랍장 2:" in out
     # 에이전트가 화면 번호 그대로 말해도 같은 물건이 가리켜진다
@@ -262,3 +265,116 @@ def test_result_after_remove_reports_renumbered_items():
     list(agent.resume_stream(g, "t1", True, {"ops": [{"ok": True, "text": "책상 2 삭제"}]}, CHECKS, after))
     seen = tool_messages(llm, 1)[-1]
     assert "적용 뒤 현재 번호" in seen and "  책상 2: place=left, w=800" in seen and "책상 3" not in seen
+
+
+# ---- 독립 모니터 --------------------------------------------------------------------------------
+
+MONITORS_SPEC = {"monitors": {"label": "모니터", "item_label": "모니터", "max": 3, "max_note": "모니터는 모니터 1을 포함해 최대 4대예요", "first": 2, "fields": [
+    {"key": "mon", "label": "모델", "type": "select",
+     "options": [{"value": "27", "label": '27" 16:9'}, {"value": "34uw", "label": '34" 21:9 울트라와이드'}]},
+    {"key": "curved", "label": "커브드 화면", "type": "toggle"},
+    {"key": "mount", "label": "거치 방식", "type": "select",
+     "options": [{"value": "stand", "label": "기본 스탠드"}, {"value": "arm", "label": "모니터암"}]},
+    {"key": "lift", "label": "모니터 하단 높이", "type": "range", "min": 0, "max": 450, "step": 5, "unit": "mm"},
+    {"key": "yaw", "label": "좌우 각도", "type": "range", "min": -60, "max": 60, "step": 1, "unit": "°"}]}}
+TWO_MONITORS = {**STATE, "monitors": [{"mon": "27", "mount": "stand", "lift": 100, "yaw": -20},
+                                      {"mon": "27", "mount": "stand", "lift": 100, "yaw": 20}]}
+
+
+def test_each_added_monitor_is_edited_independently_by_its_number():
+    ops, items, problems, _ = validate_ops(
+        [{"op": "update", "collection": "monitors", "number": 3, "values": {"mon": "34uw", "lift": 250, "mount": "arm"}}],
+        MONITORS_SPEC, TWO_MONITORS)
+    assert not problems
+    assert ops == [{"op": "update", "collection": "monitors", "index": 1, "values": {"mon": "34uw", "lift": 250, "mount": "arm"}}]
+    assert {i["label"] for i in items} == {"모니터 3: 모델", "모니터 3: 거치 방식", "모니터 3: 모니터 하단 높이"}
+
+
+def test_monitor_numbers_start_at_two_and_have_a_cap():
+    _, _, problems, _ = validate_ops([{"op": "update", "collection": "monitors", "number": 1, "values": {"lift": 200}}],
+                                     MONITORS_SPEC, TWO_MONITORS)
+    assert "2~3번" in problems[0]  # 모니터 1은 array_ops 대상이 아니다
+    full = {**STATE, "monitors": [{"mon": "27"}] * 3}
+    ops, _, problems, _ = validate_ops([{"op": "add", "collection": "monitors"}], MONITORS_SPEC, full)
+    assert not ops and "모니터 1을 포함해 최대 4대" in problems[0]  # 추가 3대 + 모니터 1
+
+
+def test_add_monitor_with_values_shows_a_clear_card_label():
+    ops, items, _, _ = validate_ops(
+        [{"op": "add", "collection": "monitors", "values": {"mon": "34uw", "curved": True, "lift": 12345}}], MONITORS_SPEC, STATE)
+    assert ops[0]["values"] == {"mon": "34uw", "curved": True, "lift": 450}  # 높이는 범위로 맞춘다
+    assert items[0]["label"] == "모니터 추가" and "34" in items[0]["to"]
+
+
+# ---- 평가에서 발견한 약점의 회귀 방지 ------------------------------------------------------------
+
+def test_user_who_declined_is_not_asked_again_in_the_same_request():
+    from src.agent.graph import ALREADY_DECLINED_TEXT, REJECTED_TEXT
+
+    llm = FakeLLM(call("ProposeChanges", {"changes": {"mon": "32"}, "reason": "크게"}, "c1"),
+                  call("ProposeChanges", {"changes": {"monBack": 300}, "reason": "대안"}, "c2"),  # 거절 직후 또 제안
+                  text("알겠어요. 그대로 둘게요."))
+    g, events = run(llm, "모니터 32인치로")
+    assert events[-1]["type"] == "approval"
+    resumed = list(agent.resume_stream(g, "t1", False))
+    assert not any(e["type"] == "approval" for e in resumed)  # 두 번째 승인 카드는 뜨지 않는다
+    assert resumed[-1]["type"] == "result" and resumed[-1]["answer"] == "알겠어요. 그대로 둘게요."
+    assert tool_messages(llm, 2) == [REJECTED_TEXT, ALREADY_DECLINED_TEXT]
+
+
+def test_new_request_after_a_decline_can_propose_again():
+    llm = FakeLLM(call("ProposeChanges", {"changes": {"mon": "32"}, "reason": "a"}), text("알겠어요."))
+    g, _ = run(llm, "32인치로")
+    list(agent.resume_stream(g, "t1", False))
+    llm2 = FakeLLM(call("ProposeChanges", {"changes": {"deskW": 1600}, "reason": "b"}), text("됐어요."))
+    _, events = run(llm2, "다른 요청")  # declined는 요청마다 초기화된다
+    assert events[-1]["type"] == "approval"
+
+
+def test_describe_shows_capacity_so_the_agent_does_not_ask_about_position_when_full():
+    caps = {"monitors": {"max": 3, "max_note": "모니터는 모니터 1을 포함해 최대 4대예요"}, "drawers": {"max": 4}}
+    state = {**STATE, "monitors": [{"mon": "27"}] * 3, "drawers": [DRAWER]}
+    out = describe(state, [], None, caps)
+    assert "추가 모니터 3개 (모니터는 모니터 1을 포함해 최대 4대예요, 더 추가할 수 없음):" in out
+    assert "서랍장 1개 (최대 4개):" in out  # 아직 여유가 있으면 '더 추가할 수 없음'은 붙지 않는다
+    assert "서랍장 1개:" in describe(state, [], None)  # 한도 정보가 없으면 예전 그대로
+
+
+# ---- 선택지 이해·버려진 값 표시·범위 처리(평가 2차에서 발견) -------------------------------------
+
+def test_option_given_as_partial_label_is_understood_when_unique():
+    from src.agent.settings import validate_patch
+
+    fields = COLLECTIONS["drawers"]["fields"]
+    clean, rejected, notes = validate_patch({"where": "오른쪽"}, fields)
+    assert clean == {"where": "underR"} and not rejected and "이해했어요" in notes["where"]
+    clean, rejected, _ = validate_patch({"where": "책상 밑"}, fields)  # 왼쪽·오른쪽 둘 다 맞으면 추측하지 않는다
+    assert clean == {} and "where" in rejected
+    assert validate_patch({"where": "underL"}, fields)[0] == {"where": "underL"}  # 정확한 값이 먼저
+
+
+def test_proposal_with_unknown_values_is_sent_back_to_the_model_instead_of_shown():
+    bad = call("ProposeChanges", {"array_ops": [{"op": "add", "collection": "drawers", "values": {"side": "right", "tiers": 4}}], "reason": "수납"}, "c1")
+    good = call("ProposeChanges", {"array_ops": [{"op": "add", "collection": "drawers", "values": {"where": "underR", "tiers": 4}}], "reason": "수납"}, "c2")
+    llm = FakeLLM(bad, good, text("끝."))
+    _, events = run(llm, "서랍장 추가", collections=COLLECTIONS, slots=SLOTS)
+    card = events[-1]
+    assert card["type"] == "approval"  # 첫 제안은 카드가 되지 않고, 고쳐서 다시 제안한 것만 카드가 된다
+    assert card["patch"]["array_ops"][0]["values"] == {"where": "underR", "tiers": 4}
+    bounced = tool_messages(llm, 1)[0]
+    assert "승인 카드를 띄우지 않았어요" in bounced and "side" in bounced
+    assert "where" in bounced and "tiers" in bounced  # 모델이 고칠 수 있게 허용 키를 같이 돌려준다
+
+
+def test_unknown_scalar_key_is_also_sent_back_but_range_snapping_still_shows_a_card():
+    llm = FakeLLM(call("ProposeChanges", {"changes": {"deskW": 1600, "bogus": 1}, "reason": "a"}), text("다시 확인할게요."))
+    _, events = run(llm, "책상 가로 1600")
+    assert not any(e["type"] == "approval" for e in events)  # 알 수 없는 키가 섞이면 통째로 돌려보낸다
+    assert "bogus" in tool_messages(llm, 1)[0]
+
+
+def test_out_of_range_value_is_passed_through_and_snapped_by_code():
+    llm = FakeLLM(call("ProposeChanges", {"changes": {"deskW": 5000}, "reason": "크게"}), text("끝."))
+    _, events = run(llm, "책상 가로 5000")
+    card = events[-1]
+    assert card["patch"]["changes"] == {"deskW": 2400} and "deskW" in card["notes"]  # 모델이 아니라 코드가 맞춘다

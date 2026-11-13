@@ -1,0 +1,1310 @@
+{
+ "state": {
+  "deskW": 1400,
+  "deskD": 700,
+  "deskH": 720,
+  "deskColor": "#f3f0ea",
+  "frameColor": "#ecebe7",
+  "mon": "27",
+  "curved": false,
+  "mount": "stand",
+  "monBack": 200,
+  "monLift": 100,
+  "kb": "tkl",
+  "theme": "white",
+  "mouse": true,
+  "mat": "900x400",
+  "matColor": "#e9dfd2",
+  "laptop": "none",
+  "tower": "none",
+  "speakers": false,
+  "chair": false,
+  "userH": 175,
+  "dims": true,
+  "extraDesks": [],
+  "drawers": [],
+  "room": false,
+  "roomW": 3000,
+  "roomD": 3300,
+  "roomH": 2300,
+  "roomX": 0,
+  "roomGap": 0,
+  "wallColor": "#f4f2ee",
+  "floorColor": "#d9b98f",
+  "win": true,
+  "winW": 1500,
+  "winX": 0,
+  "door": true,
+  "doorWall": "right",
+  "lapSide": "left",
+  "lapSize": "14",
+  "lapAngle": 17,
+  "monX": 0,
+  "armX": 0,
+  "sets": [],
+  "pegs": [],
+  "monitors": []
+ },
+ "checks": [
+  {
+   "title": "좌우 여유",
+   "value": "왼쪽 316 · 오른쪽 185 mm",
+   "status": "ok",
+   "note": "모니터 전체 폭 612mm / 책상 1400mm"
+  },
+  {
+   "title": "눈 ↔ 화면 거리",
+   "value": "약 620 mm",
+   "status": "warn",
+   "note": "권장 670~870mm · 50mm 더 떨어지면 좋아요"
+  },
+  {
+   "title": "키보드 ↔ 모니터 간격",
+   "value": "200 mm",
+   "status": "ok",
+   "note": "스탠드 받침 앞까지 기준"
+  },
+  {
+   "title": "화면 위쪽 vs 눈높이",
+   "value": "눈보다 60mm 아래",
+   "status": "ok",
+   "note": "화면 위쪽이 눈높이 근처면 좋아요"
+  },
+  {
+   "title": "책상 높이",
+   "value": "720 mm",
+   "status": "ok",
+   "note": "키 175cm 기준 권장 약 720mm"
+  },
+  {
+   "title": "화면이 차지하는 시야",
+   "value": "좌우 약 53°",
+   "status": "info",
+   "note": "눈만 움직여도 다 보여요"
+  }
+ ],
+ "schema": [
+  {
+   "key": "deskW",
+   "label": "가로 (폭)",
+   "type": "range",
+   "min": 600,
+   "max": 2400,
+   "step": 10,
+   "unit": "mm",
+   "section": "책상"
+  },
+  {
+   "key": "deskD",
+   "label": "세로 (깊이)",
+   "type": "range",
+   "min": 400,
+   "max": 1000,
+   "step": 10,
+   "unit": "mm",
+   "section": "책상"
+  },
+  {
+   "key": "deskH",
+   "label": "높이",
+   "type": "range",
+   "min": 600,
+   "max": 1250,
+   "step": 5,
+   "unit": "mm",
+   "section": "책상"
+  },
+  {
+   "key": "deskColor",
+   "label": "상판 색",
+   "type": "swatch",
+   "options": [
+    {
+     "value": "#f3f0ea",
+     "label": "화이트"
+    },
+    {
+     "value": "#dcc4a2",
+     "label": "메이플"
+    },
+    {
+     "value": "#b88a5e",
+     "label": "오크"
+    },
+    {
+     "value": "#6a4a35",
+     "label": "월넛"
+    },
+    {
+     "value": "#8f9296",
+     "label": "그레이"
+    },
+    {
+     "value": "#2a2a2c",
+     "label": "블랙"
+    }
+   ],
+   "section": "책상"
+  },
+  {
+   "key": "frameColor",
+   "label": "프레임 색",
+   "type": "swatch",
+   "options": [
+    {
+     "value": "#ecebe7",
+     "label": "화이트"
+    },
+    {
+     "value": "#b9bcc0",
+     "label": "실버"
+    },
+    {
+     "value": "#2b2c2f",
+     "label": "블랙"
+    }
+   ],
+   "section": "책상"
+  },
+  {
+   "key": "room",
+   "label": "방 보이기",
+   "type": "toggle",
+   "section": "방"
+  },
+  {
+   "key": "roomW",
+   "label": "방 가로",
+   "type": "range",
+   "min": 1800,
+   "max": 7000,
+   "step": 50,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "roomD",
+   "label": "방 세로",
+   "type": "range",
+   "min": 1800,
+   "max": 7000,
+   "step": 50,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "roomH",
+   "label": "천장 높이",
+   "type": "range",
+   "min": 2100,
+   "max": 3200,
+   "step": 10,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "roomX",
+   "label": "책상 좌우 위치 (방 가운데 기준)",
+   "type": "range",
+   "min": -3000,
+   "max": 3000,
+   "step": 10,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "roomGap",
+   "label": "뒤 벽과 책상 사이",
+   "type": "range",
+   "min": 0,
+   "max": 3000,
+   "step": 10,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "wallColor",
+   "label": "벽 색",
+   "type": "swatch",
+   "options": [
+    {
+     "value": "#f4f2ee",
+     "label": "화이트"
+    },
+    {
+     "value": "#e6e0d8",
+     "label": "웜그레이"
+    },
+    {
+     "value": "#ece2d2",
+     "label": "베이지"
+    },
+    {
+     "value": "#d3dccf",
+     "label": "세이지"
+    },
+    {
+     "value": "#d5dbe3",
+     "label": "블루그레이"
+    }
+   ],
+   "section": "방"
+  },
+  {
+   "key": "floorColor",
+   "label": "바닥",
+   "type": "swatch",
+   "options": [
+    {
+     "value": "#d9b98f",
+     "label": "밝은 원목"
+    },
+    {
+     "value": "#c39a6b",
+     "label": "내추럴 원목"
+    },
+    {
+     "value": "#6e4e37",
+     "label": "어두운 원목"
+    },
+    {
+     "value": "#bdb9b2",
+     "label": "그레이"
+    },
+    {
+     "value": "#ecebe7",
+     "label": "화이트 타일"
+    }
+   ],
+   "section": "방"
+  },
+  {
+   "key": "win",
+   "label": "창문 (뒤 벽)",
+   "type": "toggle",
+   "section": "방"
+  },
+  {
+   "key": "winW",
+   "label": "창문 폭",
+   "type": "range",
+   "min": 500,
+   "max": 3500,
+   "step": 50,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "winX",
+   "label": "창문 좌우 위치 (방 가운데 기준)",
+   "type": "range",
+   "min": -3000,
+   "max": 3000,
+   "step": 10,
+   "unit": "mm",
+   "section": "방"
+  },
+  {
+   "key": "door",
+   "label": "문",
+   "type": "toggle",
+   "section": "방"
+  },
+  {
+   "key": "doorWall",
+   "label": "문 위치",
+   "type": "seg",
+   "options": [
+    {
+     "value": "left",
+     "label": "왼쪽 벽"
+    },
+    {
+     "value": "right",
+     "label": "오른쪽 벽"
+    },
+    {
+     "value": "front",
+     "label": "앞쪽 벽"
+    }
+   ],
+   "section": "방"
+  },
+  {
+   "key": "mon",
+   "label": "모델",
+   "type": "select",
+   "options": [
+    {
+     "value": "24",
+     "label": "24\" 16:9"
+    },
+    {
+     "value": "27",
+     "label": "27\" 16:9"
+    },
+    {
+     "value": "32",
+     "label": "32\" 16:9"
+    },
+    {
+     "value": "42",
+     "label": "42\" 16:9 (OLED)"
+    },
+    {
+     "value": "34uw",
+     "label": "34\" 21:9 울트라와이드"
+    },
+    {
+     "value": "38uw",
+     "label": "38\" 24:10 울트라와이드"
+    },
+    {
+     "value": "40uw",
+     "label": "40\" 5K2K 울트라와이드"
+    },
+    {
+     "value": "45uw",
+     "label": "45\" 21:9 울트라와이드"
+    },
+    {
+     "value": "49suw",
+     "label": "49\" 32:9 슈퍼울트라와이드"
+    },
+    {
+     "value": "57suw",
+     "label": "57\" 32:9 슈퍼울트라와이드"
+    }
+   ],
+   "section": "모니터 1"
+  },
+  {
+   "key": "curved",
+   "label": "커브드 화면",
+   "type": "toggle",
+   "section": "모니터 1"
+  },
+  {
+   "key": "mount",
+   "label": "거치 방식",
+   "type": "seg",
+   "options": [
+    {
+     "value": "stand",
+     "label": "기본 스탠드"
+    },
+    {
+     "value": "arm",
+     "label": "모니터암"
+    },
+    {
+     "value": "armLap",
+     "label": "모니터+노트북 암"
+    }
+   ],
+   "section": "모니터 1"
+  },
+  {
+   "key": "lapSide",
+   "label": "노트북 거치 위치",
+   "type": "seg",
+   "options": [
+    {
+     "value": "left",
+     "label": "왼쪽"
+    },
+    {
+     "value": "right",
+     "label": "오른쪽"
+    }
+   ],
+   "section": "모니터 1"
+  },
+  {
+   "key": "lapSize",
+   "label": "노트북 크기",
+   "type": "seg",
+   "options": [
+    {
+     "value": "13",
+     "label": "13\""
+    },
+    {
+     "value": "14",
+     "label": "14\""
+    },
+    {
+     "value": "16",
+     "label": "16\""
+    }
+   ],
+   "section": "모니터 1"
+  },
+  {
+   "key": "lapAngle",
+   "label": "노트북 안쪽으로 꺾는 각도",
+   "type": "range",
+   "min": 0,
+   "max": 70,
+   "step": 1,
+   "unit": "°",
+   "section": "모니터 1"
+  },
+  {
+   "key": "monBack",
+   "label": "화면 위치 (책상 뒤 끝 → 화면)",
+   "type": "range",
+   "min": 40,
+   "max": 700,
+   "step": 10,
+   "unit": "mm",
+   "section": "모니터 1"
+  },
+  {
+   "key": "monLift",
+   "label": "모니터 하단 높이 (책상 위)",
+   "type": "range",
+   "min": 0,
+   "max": 450,
+   "step": 5,
+   "unit": "mm",
+   "section": "모니터 1"
+  },
+  {
+   "key": "monX",
+   "label": "모니터 좌우 위치 (책상 가운데 기준)",
+   "type": "range",
+   "min": -1200,
+   "max": 1200,
+   "step": 10,
+   "unit": "mm",
+   "section": "모니터 1"
+  },
+  {
+   "key": "armX",
+   "label": "암 기둥(클램프) 좌우 위치",
+   "type": "range",
+   "min": -1200,
+   "max": 1200,
+   "step": 10,
+   "unit": "mm",
+   "section": "모니터 1"
+  },
+  {
+   "key": "kb",
+   "label": "키보드",
+   "type": "seg",
+   "options": [
+    {
+     "value": "65",
+     "label": "65%"
+    },
+    {
+     "value": "75",
+     "label": "75%"
+    },
+    {
+     "value": "none",
+     "label": "없음"
+    },
+    {
+     "value": "full",
+     "label": "풀배열"
+    },
+    {
+     "value": "tkl",
+     "label": "텐키리스"
+    }
+   ],
+   "section": "입력 장치"
+  },
+  {
+   "key": "theme",
+   "label": "키보드·마우스 색",
+   "type": "seg",
+   "options": [
+    {
+     "value": "white",
+     "label": "화이트"
+    },
+    {
+     "value": "black",
+     "label": "블랙"
+    }
+   ],
+   "section": "입력 장치"
+  },
+  {
+   "key": "mouse",
+   "label": "마우스",
+   "type": "toggle",
+   "section": "입력 장치"
+  },
+  {
+   "key": "mat",
+   "label": "데스크매트",
+   "type": "select",
+   "options": [
+    {
+     "value": "none",
+     "label": "없음"
+    },
+    {
+     "value": "800x300",
+     "label": "800 × 300 mm"
+    },
+    {
+     "value": "900x400",
+     "label": "900 × 400 mm"
+    },
+    {
+     "value": "900x450",
+     "label": "900 × 450 mm"
+    },
+    {
+     "value": "1000x500",
+     "label": "1000 × 500 mm"
+    },
+    {
+     "value": "1200x600",
+     "label": "1200 × 600 mm"
+    }
+   ],
+   "section": "입력 장치"
+  },
+  {
+   "key": "matColor",
+   "label": "매트 색",
+   "type": "swatch",
+   "options": [
+    {
+     "value": "#e9dfd2",
+     "label": "베이지"
+    },
+    {
+     "value": "#c9ccd1",
+     "label": "라이트 그레이"
+    },
+    {
+     "value": "#3a3d42",
+     "label": "차콜"
+    },
+    {
+     "value": "#9bb3a1",
+     "label": "세이지"
+    },
+    {
+     "value": "#2c3a5a",
+     "label": "네이비"
+    }
+   ],
+   "section": "입력 장치"
+  },
+  {
+   "key": "laptop",
+   "label": "노트북 (책상 위 왼쪽)",
+   "type": "seg",
+   "options": [
+    {
+     "value": "none",
+     "label": "없음"
+    },
+    {
+     "value": "14",
+     "label": "14\""
+    },
+    {
+     "value": "16",
+     "label": "16\""
+    }
+   ],
+   "section": "기타 물건"
+  },
+  {
+   "key": "tower",
+   "label": "PC 본체 (미들타워)",
+   "type": "seg",
+   "options": [
+    {
+     "value": "none",
+     "label": "없음"
+    },
+    {
+     "value": "deskL",
+     "label": "책상 왼쪽"
+    },
+    {
+     "value": "deskR",
+     "label": "책상 오른쪽"
+    },
+    {
+     "value": "floor",
+     "label": "바닥"
+    }
+   ],
+   "section": "기타 물건"
+  },
+  {
+   "key": "speakers",
+   "label": "북쉘프 스피커",
+   "type": "toggle",
+   "section": "기타 물건"
+  },
+  {
+   "key": "chair",
+   "label": "의자 (크기 비교용)",
+   "type": "toggle",
+   "section": "기타 물건"
+  },
+  {
+   "key": "userH",
+   "label": "내 키",
+   "type": "range",
+   "min": 145,
+   "max": 200,
+   "step": 1,
+   "unit": "cm",
+   "section": "기타 물건"
+  },
+  {
+   "key": "dims",
+   "label": "치수선 표시",
+   "type": "toggle",
+   "section": "기타 물건"
+  }
+ ],
+ "collections": {
+  "monitors": {
+   "label": "모니터",
+   "item_label": "모니터",
+   "max": 3,
+   "max_note": "모니터는 모니터 1을 포함해 최대 4대예요",
+   "first": 2,
+   "fields": [
+    {
+     "key": "desk",
+     "label": "놓을 책상 (선택지 이름 그대로 써도 돼요)",
+     "type": "select",
+     "options": [
+      {
+       "value": 0,
+       "label": "책상 1"
+      }
+     ]
+    },
+    {
+     "key": "mon",
+     "label": "모델",
+     "type": "select",
+     "options": [
+      {
+       "value": "24",
+       "label": "24\" 16:9"
+      },
+      {
+       "value": "27",
+       "label": "27\" 16:9"
+      },
+      {
+       "value": "32",
+       "label": "32\" 16:9"
+      },
+      {
+       "value": "42",
+       "label": "42\" 16:9 (OLED)"
+      },
+      {
+       "value": "34uw",
+       "label": "34\" 21:9 울트라와이드"
+      },
+      {
+       "value": "38uw",
+       "label": "38\" 24:10 울트라와이드"
+      },
+      {
+       "value": "40uw",
+       "label": "40\" 5K2K 울트라와이드"
+      },
+      {
+       "value": "45uw",
+       "label": "45\" 21:9 울트라와이드"
+      },
+      {
+       "value": "49suw",
+       "label": "49\" 32:9 슈퍼울트라와이드"
+      },
+      {
+       "value": "57suw",
+       "label": "57\" 32:9 슈퍼울트라와이드"
+      }
+     ]
+    },
+    {
+     "key": "curved",
+     "label": "커브드 화면 (곡면 모델만 의미 있음)",
+     "type": "toggle"
+    },
+    {
+     "key": "mount",
+     "label": "거치 방식",
+     "type": "select",
+     "options": [
+      {
+       "value": "stand",
+       "label": "기본 스탠드"
+      },
+      {
+       "value": "arm",
+       "label": "모니터암"
+      }
+     ]
+    },
+    {
+     "key": "portrait",
+     "label": "세로로 세우기 (피벗)",
+     "type": "toggle"
+    },
+    {
+     "key": "x",
+     "label": "좌우 위치 (책상 가운데 기준)",
+     "type": "range",
+     "min": -1200,
+     "max": 1200,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "lift",
+     "label": "모니터 하단 높이 (책상 위)",
+     "type": "range",
+     "min": 0,
+     "max": 450,
+     "step": 5,
+     "unit": "mm"
+    },
+    {
+     "key": "back",
+     "label": "화면 위치 (책상 뒤 끝 → 화면)",
+     "type": "range",
+     "min": 40,
+     "max": 700,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "yaw",
+     "label": "좌우 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)",
+     "type": "range",
+     "min": -60,
+     "max": 60,
+     "step": 1,
+     "unit": "°"
+    },
+    {
+     "key": "armX",
+     "label": "암 기둥(클램프) 좌우 위치",
+     "type": "range",
+     "min": -1200,
+     "max": 1200,
+     "step": 10,
+     "unit": "mm"
+    }
+   ]
+  },
+  "extraDesks": {
+   "label": "추가 책상",
+   "item_label": "책상",
+   "max": 3,
+   "first": 2,
+   "fields": [
+    {
+     "key": "place",
+     "label": "위치",
+     "type": "select",
+     "options": [
+      {
+       "value": "right",
+       "label": "오른쪽 옆"
+      },
+      {
+       "value": "left",
+       "label": "왼쪽 옆"
+      },
+      {
+       "value": "rightL",
+       "label": "오른쪽 ㄱ자"
+      },
+      {
+       "value": "leftL",
+       "label": "왼쪽 ㄱ자"
+      },
+      {
+       "value": "frontR",
+       "label": "앞쪽 오른쪽 ㄱ자"
+      },
+      {
+       "value": "frontL",
+       "label": "앞쪽 왼쪽 ㄱ자"
+      },
+      {
+       "value": "back",
+       "label": "뒤쪽"
+      }
+     ]
+    },
+    {
+     "key": "w",
+     "label": "가로 (폭)",
+     "type": "range",
+     "min": 400,
+     "max": 2400,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "d",
+     "label": "세로 (깊이)",
+     "type": "range",
+     "min": 300,
+     "max": 1000,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "h",
+     "label": "높이",
+     "type": "range",
+     "min": 600,
+     "max": 1250,
+     "step": 5,
+     "unit": "mm"
+    },
+    {
+     "key": "gap",
+     "label": "책상 1과 간격",
+     "type": "range",
+     "min": 0,
+     "max": 1500,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "shift",
+     "label": "앞뒤 이동",
+     "type": "range",
+     "min": -1500,
+     "max": 1500,
+     "step": 10,
+     "unit": "mm"
+    }
+   ]
+  },
+  "drawers": {
+   "label": "서랍장",
+   "item_label": "서랍장",
+   "max": 4,
+   "first": 1,
+   "fields": [
+    {
+     "key": "where",
+     "label": "위치",
+     "type": "select",
+     "options": [
+      {
+       "value": "underL",
+       "label": "책상 밑 왼쪽"
+      },
+      {
+       "value": "underR",
+       "label": "책상 밑 오른쪽"
+      },
+      {
+       "value": "sideL",
+       "label": "책상 왼쪽 옆"
+      },
+      {
+       "value": "sideR",
+       "label": "책상 오른쪽 옆"
+      },
+      {
+       "value": "Lleft",
+       "label": "왼쪽 ㄱ자"
+      },
+      {
+       "value": "Lright",
+       "label": "오른쪽 ㄱ자"
+      },
+      {
+       "value": "FLright",
+       "label": "앞쪽 오른쪽 ㄱ자"
+      },
+      {
+       "value": "FLleft",
+       "label": "앞쪽 왼쪽 ㄱ자"
+      }
+     ]
+    },
+    {
+     "key": "w",
+     "label": "가로 (폭)",
+     "type": "range",
+     "min": 250,
+     "max": 1200,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "d",
+     "label": "깊이",
+     "type": "range",
+     "min": 250,
+     "max": 800,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "h",
+     "label": "높이",
+     "type": "range",
+     "min": 250,
+     "max": 1400,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "x",
+     "label": "좌우 이동",
+     "type": "range",
+     "min": -1500,
+     "max": 1500,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "z",
+     "label": "앞뒤 이동",
+     "type": "range",
+     "min": -1000,
+     "max": 1000,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "tiers",
+     "label": "서랍 칸 수",
+     "type": "range",
+     "min": 1,
+     "max": 6,
+     "step": 1,
+     "unit": "단"
+    },
+    {
+     "key": "casters",
+     "label": "바퀴",
+     "type": "toggle"
+    },
+    {
+     "key": "color",
+     "label": "색",
+     "type": "select",
+     "options": [
+      {
+       "value": "#f3f0ea",
+       "label": "화이트"
+      },
+      {
+       "value": "#dcc4a2",
+       "label": "메이플"
+      },
+      {
+       "value": "#b88a5e",
+       "label": "오크"
+      },
+      {
+       "value": "#6a4a35",
+       "label": "월넛"
+      },
+      {
+       "value": "#8f9296",
+       "label": "그레이"
+      },
+      {
+       "value": "#2a2a2c",
+       "label": "블랙"
+      }
+     ]
+    }
+   ]
+  },
+  "sets": {
+   "label": "모니터+노트북 세트",
+   "item_label": "모니터+노트북 세트",
+   "max": 4,
+   "first": 1,
+   "fields": [
+    {
+     "key": "desk",
+     "label": "놓을 책상 (선택지 이름 그대로 써도 돼요)",
+     "type": "select",
+     "options": [
+      {
+       "value": 0,
+       "label": "책상 1"
+      }
+     ]
+    },
+    {
+     "key": "mon",
+     "label": "모니터",
+     "type": "select",
+     "options": [
+      {
+       "value": "24",
+       "label": "24\" 16:9"
+      },
+      {
+       "value": "27",
+       "label": "27\" 16:9"
+      },
+      {
+       "value": "32",
+       "label": "32\" 16:9"
+      },
+      {
+       "value": "42",
+       "label": "42\" 16:9 (OLED)"
+      },
+      {
+       "value": "34uw",
+       "label": "34\" 21:9 울트라와이드"
+      },
+      {
+       "value": "38uw",
+       "label": "38\" 24:10 울트라와이드"
+      },
+      {
+       "value": "40uw",
+       "label": "40\" 5K2K 울트라와이드"
+      },
+      {
+       "value": "45uw",
+       "label": "45\" 21:9 울트라와이드"
+      },
+      {
+       "value": "49suw",
+       "label": "49\" 32:9 슈퍼울트라와이드"
+      },
+      {
+       "value": "57suw",
+       "label": "57\" 32:9 슈퍼울트라와이드"
+      }
+     ]
+    },
+    {
+     "key": "lap",
+     "label": "노트북도 같이 걸기",
+     "type": "toggle"
+    },
+    {
+     "key": "side",
+     "label": "노트북 위치",
+     "type": "select",
+     "options": [
+      {
+       "value": "left",
+       "label": "왼쪽"
+      },
+      {
+       "value": "right",
+       "label": "오른쪽"
+      }
+     ]
+    },
+    {
+     "key": "size",
+     "label": "노트북 크기",
+     "type": "select",
+     "options": [
+      {
+       "value": "13",
+       "label": "13\""
+      },
+      {
+       "value": "14",
+       "label": "14\""
+      },
+      {
+       "value": "16",
+       "label": "16\""
+      }
+     ]
+    },
+    {
+     "key": "kb",
+     "label": "키보드·마우스",
+     "type": "toggle"
+    },
+    {
+     "key": "yaw",
+     "label": "모니터 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)",
+     "type": "range",
+     "min": -60,
+     "max": 60,
+     "step": 1,
+     "unit": "°"
+    },
+    {
+     "key": "lapAng",
+     "label": "노트북 안쪽으로 꺾는 각도",
+     "type": "range",
+     "min": 0,
+     "max": 70,
+     "step": 1,
+     "unit": "°"
+    },
+    {
+     "key": "x",
+     "label": "좌우 위치 (책상 가운데 기준)",
+     "type": "range",
+     "min": -1200,
+     "max": 1200,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "lift",
+     "label": "모니터 하단 높이",
+     "type": "range",
+     "min": 0,
+     "max": 450,
+     "step": 5,
+     "unit": "mm"
+    },
+    {
+     "key": "back",
+     "label": "화면 위치 (책상 뒤 끝 → 화면)",
+     "type": "range",
+     "min": 60,
+     "max": 500,
+     "step": 10,
+     "unit": "mm"
+    }
+   ]
+  },
+  "pegs": {
+   "label": "타공판",
+   "item_label": "타공판",
+   "max": 4,
+   "first": 1,
+   "fields": [
+    {
+     "key": "desk",
+     "label": "놓을 책상 (선택지 이름 그대로 써도 돼요)",
+     "type": "select",
+     "options": [
+      {
+       "value": 0,
+       "label": "책상 1"
+      }
+     ]
+    },
+    {
+     "key": "color",
+     "label": "색",
+     "type": "select",
+     "options": [
+      {
+       "value": "#f2f1ed",
+       "label": "화이트"
+      },
+      {
+       "value": "#26272a",
+       "label": "블랙"
+      },
+      {
+       "value": "#9ea2a6",
+       "label": "그레이"
+      },
+      {
+       "value": "#c9a57c",
+       "label": "우드"
+      },
+      {
+       "value": "#bcd6cc",
+       "label": "민트"
+      }
+     ]
+    },
+    {
+     "key": "mount",
+     "label": "설치 방식",
+     "type": "select",
+     "options": [
+      {
+       "value": "clamp",
+       "label": "책상 클램프"
+      },
+      {
+       "value": "easel",
+       "label": "책상 위 (뒷다리)"
+      },
+      {
+       "value": "floor",
+       "label": "바닥 스탠드"
+      },
+      {
+       "value": "wall",
+       "label": "벽 부착"
+      }
+     ]
+    },
+    {
+     "key": "acc",
+     "label": "선반·후크 등 액세서리",
+     "type": "toggle"
+    },
+    {
+     "key": "w",
+     "label": "가로",
+     "type": "range",
+     "min": 300,
+     "max": 2400,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "h",
+     "label": "세로",
+     "type": "range",
+     "min": 200,
+     "max": 1400,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "lift",
+     "label": "책상 위로 띄우기",
+     "type": "range",
+     "min": 0,
+     "max": 900,
+     "step": 10,
+     "unit": "mm"
+    },
+    {
+     "key": "x",
+     "label": "좌우 위치 (책상 가운데 기준)",
+     "type": "range",
+     "min": -1200,
+     "max": 1200,
+     "step": 10,
+     "unit": "mm"
+    }
+   ]
+  }
+ },
+ "slots": {
+  "A": null,
+  "B": null,
+  "C": null
+ }
+}

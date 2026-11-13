@@ -49,6 +49,7 @@ def format_settings(schema: list[dict], section: str | None = None, collections:
         item = c.get("item_label") or c["label"]
         lines = [f"[{section}] collection={name}, 최대 {c['max']}개. 화면에는 '{item} {c['first']}', '{item} {c['first'] + 1}'처럼 번호가 붙어 있고, "
                  "update·remove의 number에는 그 번호를 그대로 쓰세요.",
+                 "add: 사용자가 말한 값만 values에 넣으세요. 나머지(위치·높이·각도·책상 등)는 시뮬레이터가 다른 물건과 겹치지 않게 자동으로 정하니 되묻지 마세요.",
                  "add/update의 values에 쓸 수 있는 키:"]
         lines += [f"- {f['key']} ({f['label']}): {_rule(f)}" for f in c["fields"]]
         return "\n".join(lines)
@@ -97,6 +98,12 @@ def validate_patch(patch: dict, schema: list[dict]) -> tuple[dict, dict, dict]:
                 rejected[key] = "true/false여야 해요"
         else:
             match = next((o for o in f["options"] if str(o["value"]) == str(raw) or o["label"] == str(raw)), None)
+            if match is None:  # '오른쪽'처럼 선택지 이름의 일부만 줘도 하나로 정해지면 그 선택지로 이해한다
+                text = str(raw).strip()
+                near = [o for o in f["options"] if text and (text in o["label"] or o["label"] in text)]
+                if len(near) == 1:
+                    match = near[0]
+                    notes[key] = f"'{raw}'를 '{match['label']}'(으)로 이해했어요"
             if match is None:
                 rejected[key] = "선택지: " + _options_text(f)
             else:
@@ -128,6 +135,7 @@ def diff_items(clean: dict, current: dict, schema: list[dict]) -> tuple[list[dic
     return items, same
 
 
+BAD_VALUE_PREFIX = "이해하지 못한 값 — "  # 키·선택지를 못 알아들은 경우(모델의 추측)와 단순히 못 하는 경우(최대 개수 등)를 구분한다
 VIEW_NAMES = {"iso": "사선", "front": "정면", "top": "위에서", "side": "옆", "pov": "앉은 시점"}
 SLOTS = ("A", "B", "C")
 
@@ -152,13 +160,13 @@ def validate_ops(ops: list, collections: dict, state: dict) -> tuple[list[dict],
         raw = op.get("values")
         values, rejected, vnotes = validate_patch(raw if isinstance(raw, dict) else {}, spec["fields"]) if kind in ("add", "update") else ({}, {}, {})
         for k, why in rejected.items():
-            problems.append(f"{label} {k}: {why}")
+            problems.append(f"{BAD_VALUE_PREFIX}{label} {k}: {why}")
         for k, why in vnotes.items():
             notes[f"{name}.{k}"] = why
         fields = {f["key"]: f for f in spec["fields"]}
         if kind == "add":
             if lens[name] >= spec["max"]:
-                problems.append(f"{label}은(는) 최대 {spec['max']}개예요")
+                problems.append(spec.get("max_note") or f"{label}은(는) 최대 {spec['max']}개예요")
                 continue
             summary = ", ".join(f"{fields[k]['label']} {_show(fields[k], v)}" for k, v in values.items()) or "기본값으로"
             items.append({"key": f"{name}+", "label": f"{label} 추가", "from": "", "to": summary})

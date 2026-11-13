@@ -1,0 +1,25 @@
+{
+ "description": "가이드 문서 검색(search_guides) 평가 세트. relevant는 정답 조각 id(knowledge/파일이름#절 순번). 하나라도 상위 k에 들면 hit. 실행: python -m src.evaluation.rag_eval",
+ "queries": [
+  {"id": "q_dist_formula", "query": "모니터랑 눈 사이 거리는 얼마가 적당해?", "relevant": ["viewing-distance#1"]},
+  {"id": "q_dist_32", "query": "32인치 모니터는 몇 cm 떨어져서 봐야 돼?", "relevant": ["viewing-distance#1", "monitor-choice#5"]},
+  {"id": "q_dist_fix", "query": "화면이 너무 코앞에 있는 것 같은데 어떻게 해?", "relevant": ["viewing-distance#2"]},
+  {"id": "q_fov", "query": "49인치 슈퍼울트라와이드 쓰면 고개를 너무 돌려야 하지 않아?", "relevant": ["viewing-distance#3"]},
+  {"id": "q_eye_strain", "query": "하루 종일 화면 보면 눈이 뻑뻑해", "relevant": ["viewing-distance#4"]},
+  {"id": "q_mon_height", "query": "모니터를 얼마나 높이 올려야 해?", "relevant": ["monitor-height#1", "monitor-height#2"]},
+  {"id": "q_neck", "query": "자꾸 고개를 숙이게 돼서 목이 뻐근해", "relevant": ["monitor-height#1", "monitor-height#2"]},
+  {"id": "q_laptop", "query": "노트북만 쓰는데 화면이 낮아", "relevant": ["monitor-height#2"]},
+  {"id": "q_pivot", "query": "모니터를 세로로 돌려서 쓰면 높이는 어떻게 맞춰?", "relevant": ["monitor-height#3"]},
+  {"id": "q_dual", "query": "모니터 두 개 놓을 때 어떻게 배치하는 게 좋아?", "relevant": ["monitor-height#4", "monitor-choice#2"]},
+  {"id": "q_desk_height", "query": "키 160인데 책상 높이 몇이 맞아?", "relevant": ["desk-chair-height#1"]},
+  {"id": "q_standing", "query": "모션데스크 세워서 쓸 때 높이", "relevant": ["desk-chair-height#2"]},
+  {"id": "q_chair", "query": "오래 앉아 있으면 허리가 아파", "relevant": ["desk-chair-height#4"]},
+  {"id": "q_kb_gap", "query": "키보드가 모니터 받침에 닿을 것 같아", "relevant": ["keyboard-mouse#1"]},
+  {"id": "q_kb_layout", "query": "풀배열이랑 텐키리스 중 뭐가 좋아?", "relevant": ["keyboard-mouse#2"]},
+  {"id": "q_wrist", "query": "타자 치면 손목이 아파", "relevant": ["keyboard-mouse#4"]},
+  {"id": "q_aisle", "query": "책상 뒤로 의자 뺄 공간이 얼마나 있어야 돼?", "relevant": ["space-layout#2"]},
+  {"id": "q_drawer", "query": "책상 아래에 서랍 넣으면 다리 들어가?", "relevant": ["space-layout#3"]},
+  {"id": "q_arm", "query": "모니터암 달면 뭐가 좋아?", "relevant": ["monitor-choice#3"]},
+  {"id": "q_uw_vs_dual", "query": "울트라와이드 하나 살까 모니터 두 대 살까", "relevant": ["monitor-choice#2"]}
+ ]
+}

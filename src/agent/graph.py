@@ -7,6 +7,7 @@
   agent  : LLM이 답하거나 도구를 고른다(문장 단위로 스트리밍)
   act    : 도구를 실행한다.
            list_settings   바로 실행(읽기)
+           search_guides   가이드 문서 하이브리드 검색(RAG, 읽기) — src/rag/retriever.py
            set_view        화면 보기 변경은 되돌리기 쉬워 승인 없이 브라우저에 알린다(client_action 이벤트)
            propose_changes 단일 설정 변경 + 아이템 추가·수정·삭제 → interrupt()로 멈춰 사용자 승인
            scene_action    초기화·슬롯 저장/불러오기 → interrupt()로 멈춰 사용자 승인
@@ -19,6 +20,7 @@
   {"type": "approval", "thread_id", "reason", "changes", "patch", "rejected", "notes"}   (승인 대기, 호출이 여기서 끝남)
 """
 import re
+import threading
 import uuid
 from typing import Annotated, Any, Literal, TypedDict
 
@@ -32,30 +34,37 @@ from pydantic import BaseModel, Field
 
 from src.agent.context import describe, describe_checks, describe_collections
 from src.agent.settings import (
-    VIEW_NAMES, diff_items, format_settings, validate_ops, validate_patch, validate_scene_action,
+    BAD_VALUE_PREFIX, VIEW_NAMES, diff_items, format_settings, validate_ops, validate_patch, validate_scene_action,
 )
+from src.rag.retriever import format_hits
 
 MAX_LOOPS = 6  # agent가 도구를 부르며 돌 수 있는 최대 횟수
+SEARCH_K = 3  # search_guides가 돌려주는 문서 조각 수
 
 SYSTEM_PROMPT = """너는 '데스크 셋업 시뮬레이터'에 붙어 있는 도우미야. 사용자가 3D로 꾸민 책상 셋업을 보고 한국어로 짧고 친근하게 답하고, 요청하면 화면의 기능을 대신 써 줘.
 
 할 수 있는 일:
 - 단일 설정 바꾸기(책상·모니터·키보드·방 등): propose_changes의 changes
-- 물건 추가·수정·삭제(추가 책상·서랍장·모니터+노트북 세트·타공판): propose_changes의 array_ops
-- 모니터 추가·삭제(모니터 1은 항상 있고, 모니터 2·3은 subCount 설정으로), 노트북·PC 본체·스피커·의자·방·데스크매트·키보드/마우스 추가·삭제: changes에서 해당 설정 켜기/끄기(list_settings로 키 확인)
+- 물건 추가·수정·삭제(모니터 2 이상·추가 책상·서랍장·모니터+노트북 세트·타공판): propose_changes의 array_ops. 모니터 2부터는 각각 독립이라 모델·거치·책상·위치·높이·각도를 따로 정해
+- 노트북·PC 본체·스피커·의자·방·데스크매트·키보드/마우스 추가·삭제: changes에서 해당 설정 켜기/끄기(list_settings로 키 확인). 켜고 끄는 키: 방=room, 스피커=speakers, 의자=chair, 치수선=dims. '방을 보이게 해줘'는 시점 변경이 아니라 room 설정을 켜는 요청이야
 - 초기화, 저장 슬롯(A·B·C) 저장·불러오기: scene_action
 - 화면 시점(사선·정면·위에서·옆·앉은 시점)과 자동 회전: set_view
+- 권장 기준·이유·고르는 요령 같은 일반 지식(예: 모니터 높이는 어느 정도가 좋아? 목이 아파, 울트라와이드랑 듀얼 중 뭐가 나아?): search_guides
 
 규칙:
 - 아래 '현재 셋업' 글과 도구 결과에 적힌 값만 근거로 말해. 없는 수치는 지어내지 말고 모른다고 해.
+- 권장 기준·이유·요령을 물으면 search_guides로 가이드 문서를 찾아 근거로 답하고, 쓴 문서 제목을 짧게 밝혀(예: '가이드 「모니터 높이와 각도」에 따르면'). 문서와 점검 결과에 없는 기준은 지어내지 마. 현재 셋업의 수치는 점검 결과를 근거로 말해.
 - 점검 결과의 '문제'·'주의' 항목을 먼저 짚고, 어떻게 바꾸면 좋을지 구체적인 값(mm 등)으로 제안해.
 - 설정을 바꾸기 전에 list_settings로 정확한 키와 허용값을 확인해. 물건을 추가·수정할 때는 해당 물건 이름(예: 서랍장)을 section으로 조회해.
+- 물건을 추가할 때 사용자가 말하지 않은 값(위치·높이·각도·책상 등)은 비워 둬. 시뮬레이터가 다른 물건과 겹치지 않게 알맞은 기본값으로 자동 배치하고, 사용자는 승인 카드에서 확인하고 나중에 고칠 수 있어. 그러니 위치를 되묻지 말고 바로 제안해.
 - propose_changes·scene_action은 사용자가 승인해야 적용돼. 관련된 변경은 한 번에 모아서 제안하고, 한 턴에 propose_changes와 scene_action은 각각 한 번만 호출해.
 - 모든 물건에는 화면과 같은 '이름 번호'가 있어(책상 1, 추가 책상은 책상 2부터, 서랍장 1, 타공판 1 …). 사용자에게도 이 이름으로 말해.
-- array_ops에서 수정·삭제할 물건은 그 번호를 number로 그대로 써(서랍장 2면 number=2, 책상 2면 number=2). 0부터 세지 마. 책상 1은 array_ops가 아니라 changes의 책상 설정으로 바꿔. 여러 개를 지울 때는 번호가 당겨지니 큰 번호부터 지워.
+- array_ops에서 수정·삭제할 물건은 그 번호를 number로 그대로 써(서랍장 2면 number=2, 책상 2면 number=2). 0부터 세지 마. 책상 1과 모니터 1은 array_ops가 아니라 changes의 설정('책상', '모니터 1' 섹션)으로 바꿔. 여러 개를 지울 때는 번호가 당겨지니 큰 번호부터 지워.
 - 도구 결과에 '적용했어요'가 나오기 전에는 바꿨다고 말하지 마. 결과의 새 점검 결과를 보고 좋아졌는지 알려 줘.
 - 이전 대화의 '완료했어요'는 그때 도구를 불러 실제로 적용한 결과였어. 이번 요청의 변경·추가·삭제·저장도 반드시 도구를 새로 불러야 하고, 도구를 부르지 않았다면 했다고 절대 말하지 마.
-- 사용자가 거절하면 다시 졸라대지 말고 다른 대안만 짧게 말해.
+- 사용자가 거절하면 다시 졸라대지 말고 다른 대안만 짧게 말해. 같은 요청에서 승인 카드를 또 띄우지 마.
+- 사용자가 허용 범위를 벗어난 값(예: 책상 가로 5000)을 말해도 되묻지 말고 말한 값 그대로 제안해. 범위 안으로 맞추는 건 네가 계산하지 않아도 코드가 하고, 어떻게 맞췄는지 승인 카드에 보여 줘.
+- 개수 한도에 이미 도달한 물건(현재 셋업에 '더 추가할 수 없음'이라고 적힌 것)은 추가를 제안하지 말고 한도를 알려 줘.
 - 사용자가 말하는 스피커·노트북·의자·서랍장 같은 물건은 모두 시뮬레이터 화면 속 가상의 물건이야. "켜줘/놔줘/추가해줘"는 추가, "꺼줘/빼줘/치워줘"는 삭제 요청으로 봐.
 - 기능과 관계없는 요청은 정중히 사양하고 셋업 얘기로 돌아와.
 - 답은 5문장 이내의 평범한 글로 써. 화면이 마크다운을 그리지 못하니 **굵게**, # 제목, 표, 목록 기호를 쓰지 마.
@@ -71,21 +80,30 @@ class ListSettings(BaseModel):
 
     section: str | None = Field(
         default=None,
-        description="섹션 이름(책상, 방, 모니터 1, 모니터 2, 입력 장치, 기타 물건) 또는 물건 이름(추가 책상, 서랍장, 모니터+노트북 세트, 타공판). 비우면 전체 키 목록.",
+        description="섹션 이름(책상, 방, 모니터 1, 입력 장치, 기타 물건) 또는 물건 이름(모니터, 추가 책상, 서랍장, 모니터+노트북 세트, 타공판). 비우면 전체 키 목록.",
     )
+
+
+class SearchGuides(BaseModel):
+    """인체공학·배치 가이드 문서를 검색한다(읽기, 승인 불필요). 권장 기준, 그 이유, 고르는 요령을 근거와 함께 답할 때 쓴다."""
+
+    query: str = Field(description="찾을 내용을 짧은 한국어 문장으로(예: '모니터 높이와 눈높이', '스탠딩 데스크 높이')")
 
 
 class ArrayOp(BaseModel):
     """추가 책상·서랍장·모니터+노트북 세트·타공판 하나에 대한 작업."""
 
     op: Literal["add", "update", "remove"] = Field(description="add=새로 놓기, update=값 바꾸기, remove=치우기")
-    collection: Literal["extraDesks", "drawers", "sets", "pegs"] = Field(
-        description="extraDesks=추가 책상, drawers=서랍장, sets=모니터+노트북 세트, pegs=타공판"
+    collection: Literal["monitors", "extraDesks", "drawers", "sets", "pegs"] = Field(
+        description="monitors=모니터 2 이상, extraDesks=추가 책상, drawers=서랍장, sets=모니터+노트북 세트, pegs=타공판"
     )
     number: int | None = Field(
         default=None, description="update·remove에서 대상의 화면 번호(서랍장 2 → 2, 책상 2 → 2). 0부터 세지 않는다. add에서는 쓰지 않는다."
     )
-    values: dict[str, Any] = Field(default_factory=dict, description="add·update에서 정할 값 {키: 값}. add에서 비우면 기본값.")
+    values: dict[str, Any] = Field(
+        default_factory=dict,
+        description="add·update에서 정할 값 {키: 값}. add에서는 사용자가 말한 것만 넣고 나머지는 비워 둔다(위치·높이·각도 등은 시뮬레이터가 자동으로 정한다).",
+    )
 
 
 class ProposeChanges(BaseModel):
@@ -123,6 +141,7 @@ class AgentState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
     loops: int
     answer: str
+    declined: bool  # 이번 요청에서 사용자가 변경 제안을 거절했는가(그러면 같은 요청에서 다시 제안하지 않는다)
 
 
 def _emit(event: dict) -> None:
@@ -160,6 +179,8 @@ def _stream_reply(llm, messages: list) -> AIMessage:
     return AIMessage(content=_text_of(full) if full is not None else "", tool_calls=list(getattr(full, "tool_calls", None) or []))
 
 
+REJECTED_TEXT = "사용자가 거절했어요. 아무것도 적용하지 않았어요."
+ALREADY_DECLINED_TEXT = "사용자가 이번 요청에서 이미 거절했어요. 다시 제안하지 말고 말로만 짧게 대안을 안내하세요."
 MAX_TRACE_RESULT = 800  # 도구 결과를 기록에 남길 때 자르는 길이
 APPLIED_PREFIXES = ("적용했어요", "화면을 바꿨어요")  # 실제로 무언가 적용됐을 때 도구 결과가 시작하는 말
 CLAIM = re.compile(r"저장했|추가했|바꿨|변경했|삭제했|제거했|치웠|초기화했|불러왔|적용했|완료했|놓았|켰|껐|돌아갔")
@@ -218,10 +239,10 @@ def _outcome_text(decision: dict, problems: list[str]) -> str:
 
 def _ask_approval(reason: str, items: list[dict], patch: dict, rejected: dict, notes: dict, problems: list[str]) -> str:
     """승인 카드를 띄우고 멈춘다. 취소면 그 사실을, 승인되면 적용 결과 글을 돌려준다."""
-    decision = interrupt({"reason": reason, "changes": items, "patch": patch, "rejected": rejected, "notes": notes})
+    decision = interrupt({"reason": reason, "changes": items, "patch": patch, "rejected": rejected, "notes": notes, "problems": problems})
     if not decision.get("approve"):
         _step_done("act", "제안을 사용자가 취소했어요")
-        return "사용자가 거절했어요. 아무것도 적용하지 않았어요."
+        return REJECTED_TEXT
     ops = (decision.get("result") or {}).get("ops") or []
     applied = (decision.get("result") or {}).get("applied") or {}
     _step_done("act", f"{len(applied) + sum(1 for o in ops if o.get('ok'))}개를 적용했어요")
@@ -239,6 +260,15 @@ def _propose(state: AgentState, args: dict) -> str:
     clean_ops, op_items, op_problems, op_notes = validate_ops(ops_raw if isinstance(ops_raw, list) else [], state.get("collections") or {}, desk)
     problems = [f"{k}: {why}" for k, why in rejected.items()] + op_problems
     notes = {**notes, **op_notes}
+    bad_values = [f"{BAD_VALUE_PREFIX}{k}: {why}" for k, why in rejected.items()] + [p for p in op_problems if p.startswith(BAD_VALUE_PREFIX)]
+    if bad_values:
+        # 모델이 없는 키나 선택지를 추측한 제안은 카드로 띄우지 않는다(버려진 값을 빼고 띄우면 사용자가 모르고 승인할 수 있다).
+        # 틀린 이유와 허용 키를 돌려줘 모델이 스스로 고쳐서 다시 제안하게 한다.
+        collections = state.get("collections") or {}
+        used = {op.get("collection") for op in (ops_raw if isinstance(ops_raw, list) else []) if isinstance(op, dict)}
+        help_text = "\n".join(format_settings(schema, collections[n]["label"], collections) for n in sorted(used & set(collections)))
+        return ("승인 카드를 띄우지 않았어요. " + "; ".join(bad_values) + ". 아래 키와 허용값을 확인해 고쳐서 다시 제안하세요."
+                + ("\n" + help_text if help_text else ""))
     if not items and not clean_ops:
         parts = ["바꿀 항목이 없어서 제안하지 않았어요."]
         if same:
@@ -276,18 +306,31 @@ def _set_view(args: dict) -> str:
     return "화면을 바꿨어요: " + ", ".join(done)
 
 
-def build_graph(llm, checkpointer=None):
-    """llm: ChatBedrockConverse 호환(bind_tools와 stream을 가진 객체). checkpointer는 interrupt에 필요해서 기본으로 메모리를 쓴다."""
-    tool_llm = llm.bind_tools([ListSettings, ProposeChanges, SceneAction, SetView])
+def _search_guides(retriever, args: dict) -> str:
+    query = str(args.get("query") or "").strip()
+    if retriever is None:
+        _step_done("act", "가이드 문서를 쓸 수 없어요")
+        return "가이드 문서 검색을 쓸 수 없어요. 문서에 없는 기준은 지어내지 말고 점검 결과만으로 답하세요."
+    if not query:
+        return "검색어가 비어 있어요. query에 찾을 내용을 넣어 다시 호출하세요."
+    hits = retriever.search(query[:200], k=SEARCH_K)
+    _step_done("act", f"가이드 문서 {len(hits)}개를 찾았어요({retriever.mode})")
+    return format_hits(hits, query)
+
+
+def build_graph(llm, checkpointer=None, retriever=None):
+    """llm: ChatBedrockConverse 호환(bind_tools와 stream을 가진 객체). checkpointer는 interrupt에 필요해서 기본으로 메모리를 쓴다.
+    retriever: 가이드 문서 검색기(src.rag.retriever.HybridRetriever). None이면 search_guides가 '쓸 수 없음'을 돌려준다."""
+    tool_llm = llm.bind_tools([ListSettings, SearchGuides, ProposeChanges, SceneAction, SetView])
 
     def context(state: AgentState) -> AgentState:
         _emit({"type": "step", "phase": "start", "node": "context", "label": STEP_LABELS["context"]})
-        text = describe(state.get("desk_state") or {}, state.get("checks") or [], state.get("slots") or {})
+        text = describe(state.get("desk_state") or {}, state.get("checks") or [], state.get("slots") or {}, state.get("collections") or {})
         messages = [SystemMessage(SYSTEM_PROMPT.format(context=text))]
         messages += _history_messages(state.get("history") or [])
         messages.append(HumanMessage(state["question"]))
         _step_done("context", f"점검 항목 {len(state.get('checks') or [])}개를 읽었어요")
-        return {"context": text, "messages": messages, "loops": 0, "answer": ""}
+        return {"context": text, "messages": messages, "loops": 0, "answer": "", "declined": False}
 
     def agent(state: AgentState) -> AgentState:
         _emit({"type": "step", "phase": "start", "node": "agent", "label": STEP_LABELS["agent"]})
@@ -307,13 +350,18 @@ def build_graph(llm, checkpointer=None):
     def act(state: AgentState) -> AgentState:
         schema = state.get("settings_schema") or []
         results, asked = [], set()
+        declined = bool(state.get("declined"))
         for call in state["messages"][-1].tool_calls:
             name, args = call["name"], call.get("args") or {}
             if name == "ListSettings":
                 content = format_settings(schema, args.get("section"), state.get("collections"))
                 _step_done("act", f"설정 목록을 조회했어요({args.get('section') or '전체'})")
+            elif name == "SearchGuides":
+                content = _search_guides(retriever, args)
             elif name == "SetView":
                 content = _set_view(args)
+            elif name in ("ProposeChanges", "SceneAction") and declined:
+                content = ALREADY_DECLINED_TEXT  # 거절한 사용자에게 같은 요청에서 승인 카드를 또 띄우지 않는다(프롬프트가 아니라 코드로 막는다)
             elif name in ("ProposeChanges", "SceneAction") and name in asked:
                 content = f"{name}는 한 번에 하나만 처리해요. 이 제안은 건너뛰었어요."
             elif name == "ProposeChanges":
@@ -324,8 +372,9 @@ def build_graph(llm, checkpointer=None):
                 content = _scene_action(state, args)
             else:
                 content = f"알 수 없는 도구예요: {name}"
+            declined = declined or content == REJECTED_TEXT
             results.append(ToolMessage(content, tool_call_id=call["id"]))
-        return {"messages": results}
+        return {"messages": results, "declined": declined}
 
     def stop(state: AgentState) -> AgentState:
         text = "생각이 길어져서 여기서 멈출게요. 원하는 걸 조금 더 구체적으로 다시 말씀해 주세요."
@@ -356,10 +405,15 @@ def build_default_graph():
 
     from src.core.config import bedrock_client_config, load_settings
 
+    from src.rag.retriever import build_retriever
+
     s = load_settings()
     retry = bedrock_client_config(s["max_retries"])
     llm = ChatBedrockConverse(model=s["llm_model_id"], region_name=s["region"], temperature=0.3, config=retry)
-    return build_graph(llm)
+    retriever = build_retriever(s["embed_model_id"], s["region"], retry)
+    # 문서 조각 임베딩(약 5초)을 미리 해 둬 첫 검색이 느리지 않게 한다. 실패하면 키워드 검색만으로 계속한다
+    threading.Thread(target=retriever.warm_up, daemon=True).start()
+    return build_graph(llm, retriever=retriever)
 
 
 def _run(graph, payload, thread_id: str):

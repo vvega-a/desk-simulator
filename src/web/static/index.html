@@ -272,10 +272,9 @@ const MATS={none:null,'800x300':[800,300],'900x400':[900,400],'900x450':[900,450
 const KB_NAME={none:'없음',full:'풀배열',tkl:'텐키리스',75:'75%',65:'65%'};
 const DEFAULTS={deskW:1400,deskD:700,deskH:720,deskColor:'#f3f0ea',frameColor:'#ecebe7',
   mon:'27',curved:false,mount:'stand',monBack:200,monLift:100,
-  subCount:0,subSide:'right',sub:'27',subPortrait:false,subAngle:20,
   kb:'tkl',theme:'white',mouse:true,mat:'900x400',matColor:'#e9dfd2',
   laptop:'none',tower:'none',speakers:false,chair:false,userH:175,dims:true,extraDesks:[],drawers:[],
-  room:false,roomW:3000,roomD:3300,roomH:2300,roomX:0,roomGap:0,wallColor:'#f4f2ee',floorColor:'#d9b98f',win:true,winW:1500,winX:0,door:true,doorWall:'right',lapSide:'left',lapSize:'14',lapAngle:17,monX:0,armX:0,sets:[],pegs:[]};
+  room:false,roomW:3000,roomD:3300,roomH:2300,roomX:0,roomGap:0,wallColor:'#f4f2ee',floorColor:'#d9b98f',win:true,winW:1500,winX:0,door:true,doorWall:'right',lapSide:'left',lapSize:'14',lapAngle:17,monX:0,armX:0,sets:[],pegs:[],monitors:[]};
 const PEG_COLORS=[{v:'#f2f1ed',l:'화이트'},{v:'#26272a',l:'블랙'},{v:'#9ea2a6',l:'그레이'},{v:'#c9a57c',l:'우드'},{v:'#bcd6cc',l:'민트'}];
 const PF=[{k:'w',t:'가로',min:300,max:2400,step:10},{k:'h',t:'세로',min:200,max:1400,step:10},{k:'lift',t:'책상 위로 띄우기',min:0,max:900,step:10},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10}];
 const SF=[{k:'yaw',t:'모니터 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)',min:-60,max:60,step:1,unit:'°'},{k:'lapAng',t:'노트북 안쪽으로 꺾는 각도',min:0,max:70,step:1,unit:'°'},{k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10},{k:'lift',t:'모니터 하단 높이',min:0,max:450,step:5},{k:'back',t:'화면 위치 (책상 뒤 끝 → 화면)',min:60,max:500,step:10}];
@@ -286,7 +285,7 @@ const DPRESET={mobile:{l:'이동식 3단',w:400,d:500,h:600,tiers:3,casters:true
 const DF=[{k:'w',t:'가로 (폭)',min:250,max:1200,step:10},{k:'d',t:'깊이',min:250,max:800,step:10},{k:'h',t:'높이',min:250,max:1400,step:10},{k:'x',t:'좌우 이동',min:-1500,max:1500,step:10},{k:'z',t:'앞뒤 이동',min:-1000,max:1000,step:10}];
 const PLACES=[{v:'right',l:'오른쪽 옆'},{v:'left',l:'왼쪽 옆'},{v:'rightL',l:'오른쪽 ㄱ자'},{v:'leftL',l:'왼쪽 ㄱ자'},{v:'frontR',l:'앞쪽 오른쪽 ㄱ자'},{v:'frontL',l:'앞쪽 왼쪽 ㄱ자'},{v:'back',l:'뒤쪽'}];
 const XF=[{k:'w',t:'가로 (폭)',min:400,max:2400,step:10},{k:'d',t:'세로 (깊이)',min:300,max:1000,step:10},{k:'h',t:'높이',min:600,max:1250,step:5},{k:'gap',t:'책상 1과 간격',min:0,max:1500,step:10},{k:'shift',t:'앞뒤 이동',min:-1500,max:1500,step:10}];
-let S={...DEFAULTS,extraDesks:[],drawers:[],sets:[],pegs:[]};
+let S={...DEFAULTS,extraDesks:[],drawers:[],sets:[],pegs:[],monitors:[]};
 
 const UI=[
  {sec:'책상',items:[
@@ -323,13 +322,6 @@ const UI=[
   {k:'monX',t:'모니터 좌우 위치 (책상 가운데 기준)',type:'range',min:-1200,max:1200,step:10,unit:'mm',chips:[-300,0,300]},
   {k:'armX',t:'암 기둥(클램프) 좌우 위치',type:'range',min:-1200,max:1200,step:10,unit:'mm',chips:[-400,0,400],when:()=>S.mount!=='stand'},
  ]},
- {sec:'모니터 2',items:[
-  {k:'subCount',t:'개수',type:'seg',opts:[{v:0,l:'없음'},{v:1,l:'1대'},{v:2,l:'2대 (양옆)'}]},
-  {k:'subSide',t:'위치',type:'seg',opts:[{v:'left',l:'왼쪽'},{v:'right',l:'오른쪽'}],when:()=>S.subCount==1},
-  {k:'sub',t:'크기',type:'seg',opts:[{v:'24',l:'24"'},{v:'27',l:'27"'},{v:'32',l:'32"'}],when:()=>S.subCount>0},
-  {k:'subPortrait',t:'세로로 세우기 (피벗)',type:'toggle',when:()=>S.subCount>0},
-  {k:'subAngle',t:'안쪽으로 꺾는 각도',type:'range',min:0,max:50,step:1,unit:'°',when:()=>S.subCount>0},
- ]},
  {sec:'입력 장치',items:[
   {k:'kb',t:'키보드',type:'seg',opts:Object.entries(KB_NAME).map(([v,l])=>({v,l}))},
   {k:'theme',t:'키보드·마우스 색',type:'seg',opts:[{v:'white',l:'화이트'},{v:'black',l:'블랙'}]},
@@ -352,6 +344,7 @@ const MOUNT_NAME={stand:'기본 스탠드',arm:'모니터암',armLap:'모니터+
 const TOWER_NAME={deskL:'책상 왼쪽',deskR:'책상 오른쪽',floor:'바닥'};
 // 배열로 여러 개 놓는 물건. addBtn은 기존 추가 로직(기본값 계산 포함)을 그대로 쓰기 위한 버튼
 const ARR=[
+  {key:'monitors',box:'monitors',label:'모니터',item:'모니터',first:2,max:3,addBtn:'#addMonitor',maxNote:'모니터는 모니터 1을 포함해 최대 4대예요',maxShort:'최대 4대 (모니터 1 포함)',sum:e=>`${(MONITORS[e.mon]||MONITORS['27']).short} · ${e.mount==='arm'?'모니터암':'스탠드'}${e.desk?` · 책상 ${e.desk+1}`:''}`},
   {key:'extraDesks',box:'extra',label:'추가 책상',item:'책상',first:2,max:3,addBtn:'#addDesk',sum:e=>`${e.w}×${e.d} · ${(PLACES.find(p=>p.v===e.place)||{}).l||''}`},
   {key:'drawers',box:'drawers',label:'서랍장',first:1,max:4,addBtn:'#addDrawer',sum:e=>`${e.w}×${e.d}×${e.h} · ${e.tiers}단`},
   {key:'sets',box:'sets',label:'모니터+노트북 세트',first:1,max:4,addBtn:'#addSet',sum:e=>`${MONITORS[e.mon].short}${e.lap?' + 노트북':''}`},
@@ -362,7 +355,6 @@ const ITEM_DEFS=[
   {id:'basic',label:'내 키 · 표시',fixed:true,keys:['userH','dims'],sum:()=>`키 ${S.userH}cm`},
   {id:'desk',label:'책상 1',fixed:true,keys:['deskW','deskD','deskH','deskColor','frameColor'],sum:()=>`${S.deskW}×${S.deskD} · H ${S.deskH}`},
   {id:'mon',label:'모니터 1',fixed:true,keys:['mon','curved','mount','lapSide','lapSize','lapAngle','monBack','monLift','monX','armX'],sum:()=>`${MONITORS[S.mon].short} · ${MOUNT_NAME[S.mount]}`},
-  {id:'sub',label:()=>S.subCount>1?'모니터 2·3':'모니터 2',menu:'모니터',keys:['subCount','subSide','sub','subPortrait','subAngle'],on:()=>S.subCount>0,add:()=>set('subCount',1),remove:()=>set('subCount',0),sum:()=>`${MONITORS[S.sub].short} × ${S.subCount}`},
   {id:'kbm',label:'키보드 · 마우스',keys:['kb','theme','mouse'],on:()=>S.kb!=='none'||S.mouse,add:()=>{set('kb','tkl');set('mouse',true)},remove:()=>{set('kb','none');set('mouse',false)},sum:()=>`${KB_NAME[S.kb]}${S.mouse?' + 마우스':''}`},
   {id:'mat',label:'데스크매트',keys:['mat','matColor'],on:()=>S.mat!=='none',add:()=>set('mat','900x400'),remove:()=>set('mat','none'),sum:()=>S.mat.replace('x',' × ')+' mm'},
   {id:'laptop',label:'노트북',keys:['laptop'],on:()=>S.laptop!=='none',add:()=>set('laptop','14'),remove:()=>set('laptop','none'),sum:()=>`${S.laptop}"`},
@@ -431,15 +423,18 @@ function placeDetail(){
   (mobile?$('#detailMobile'):document.querySelector('main.stage')).appendChild(d);
 }
 function listItems(){
-  const out=[];
-  for(const d of ITEM_DEFS)if(d.fixed||d.on())out.push({id:d.id,label:typeof d.label==='function'?d.label():d.label,sum:d.sum(),fixed:!!d.fixed});
-  for(const a of ARR)S[a.key].forEach((e,i)=>out.push({id:a.key+':'+i,label:`${a.item} ${i+a.first}`,sum:a.sum(e),fixed:false}));
+  const out=[],arr=a=>S[a.key].forEach((e,i)=>out.push({id:a.key+':'+i,label:`${a.item} ${i+a.first}`,sum:a.sum(e),fixed:false}));
+  for(const d of ITEM_DEFS){
+    if(d.fixed||d.on())out.push({id:d.id,label:typeof d.label==='function'?d.label():d.label,sum:d.sum(),fixed:!!d.fixed});
+    if(d.id==='mon')arr(ARR.find(a=>a.key==='monitors')); // 추가 모니터는 모니터 1 바로 아래에
+  }
+  for(const a of ARR)if(a.key!=='monitors')arr(a);
   return out;
 }
 function addables(){
   const out=[];
   for(const d of ITEM_DEFS)if(!d.fixed)out.push({label:d.menu||d.label,off:d.on()?'이미 추가됨':'',run:()=>{d.add();sel=d.id}});
-  for(const a of ARR)out.push({label:a.label,off:S[a.key].length>=a.max?`최대 ${a.max}개`:'',run:()=>{const b=$(a.addBtn);if(b)b.click();sel=a.key+':'+(S[a.key].length-1)}});
+  for(const a of ARR)out.push({label:a.label,off:S[a.key].length>=a.max?(a.maxShort||`최대 ${a.max}개`):'',run:()=>{const b=$(a.addBtn);if(b)b.click();sel=a.key+':'+(S[a.key].length-1)}});
   return out;
 }
 function toggleAddMenu(open){
@@ -481,8 +476,10 @@ function syncDetail(L){
 {const f=renderDrawers;renderDrawers=function(){f();syncDetail()}}
 {const f=renderSets;renderSets=function(){f();syncDetail()}}
 {const f=renderPegs;renderPegs=function(){f();syncDetail()}}
+{const f=renderMonitors;renderMonitors=function(){f();syncDetail()}}
 
 function renderExtra(){
+  if($('#monitors'))setTimeout(renderMonitors,0);
   if($('#sets'))setTimeout(renderSets,0);
   if($('#pegs'))setTimeout(renderPegs,0);
   const box=$('#extra'),L=S.extraDesks;
@@ -749,6 +746,66 @@ function buildSet(e,c){
   g.position.set(c.x,0,c.z);g.rotation.y=c.r;
   return g;
 }
+/* ---------- 추가 모니터: 각각 독립된 모니터(모델·거치·책상·위치·높이·각도를 따로 가진다) ---------- */
+function monWidth(model,portrait){
+  const sp=MONITORS[model]||MONITORS['27'],p=panelSize(sp.d,sp.ar);
+  return (portrait?p.h:p.w)+14; // 베젤 포함
+}
+// 새 모니터의 기본값: 책상 1 위의 모니터들이 차지한 좌우 범위에서 더 비어 있는 쪽에 안쪽으로 살짝 꺾어 붙인다
+function newMonitor(){
+  const aa=20*Math.PI/180,W=monWidth('27',false),w1=monWidth(S.mon,false);
+  let lo=S.monX-w1/2,hi=S.monX+w1/2;
+  for(const m of S.monitors)if(!m.desk){const w=monWidth(m.mon,m.portrait);lo=Math.min(lo,m.x-w/2);hi=Math.max(hi,m.x+w/2)}
+  const side=(hi-S.monX)<=(S.monX-lo)?1:-1;
+  const x=side>0?hi+12+W/2*Math.cos(aa):lo-12-W/2*Math.cos(aa);
+  return {desk:0,mon:'27',curved:false,mount:S.mount==='stand'?'stand':'arm',portrait:false,
+    x:Math.max(-1200,Math.min(1200,Math.round(x/10)*10)),lift:S.monLift,
+    back:Math.min(700,Math.round((S.monBack+W/2*Math.sin(aa))/10)*10),yaw:-side*20,armX:0};
+}
+function buildMonitorItem(e,c){
+  const g=new THREE.Group(),spec=MONITORS[e.mon]||MONITORS['27'];
+  const m=buildMonitor(spec,{portrait:!!e.portrait,curved:!!e.curved&&!!spec.R});
+  const mz=-c.d/2+e.back,mcy=c.h+e.lift+m.chin+m.h/2;
+  m.g.position.set(e.x,mcy,mz);m.g.rotation.y=(e.yaw||0)*Math.PI/180;g.add(m.g);
+  if(e.mount==='arm'){
+    const pm=M('#2a2b2f',{r:.35,m:.4}),pz=-c.d/2+40,px=Math.max(-c.w/2+60,Math.min(c.w/2-60,e.x+(e.armX||0))),ph=Math.max(420,mcy+60-c.h);
+    g.add(cylBetween(V(px,c.h,pz),V(px,c.h+ph,pz),18,pm));g.add(at(box(70,50,90,pm),px,c.h-10,pz));
+    m.g.add(at(box(100,100,12,pm),0,0,-m.hd-6));
+    g.updateMatrixWorld(true);
+    const p=m.g.localToWorld(V(0,0,-m.hd-14)),p0=V(px,p.y,pz),j=V(px+(p.x-px)*.55,p.y,pz+Math.max(30,(p.z-pz)*.3));
+    g.add(cylBetween(p0,j,14,pm));g.add(cylBetween(j,p,14,pm));g.add(at(new THREE.Mesh(new THREE.SphereGeometry(20,16,12),pm),j.x,j.y,j.z));
+  }else addStand(m,-(e.lift+m.chin+m.h/2));
+  g.position.set(c.x,0,c.z);g.rotation.y=c.r;
+  return {g,m};
+}
+const MF=[
+  {k:'x',t:'좌우 위치 (책상 가운데 기준)',min:-1200,max:1200,step:10},
+  {k:'lift',t:'모니터 하단 높이 (책상 위)',min:0,max:450,step:5},
+  {k:'back',t:'화면 위치 (책상 뒤 끝 → 화면)',min:40,max:700,step:10},
+  {k:'yaw',t:'좌우 각도 (+ 오른쪽을 봄 / − 왼쪽을 봄)',min:-60,max:60,step:1,unit:'°'},
+  {k:'armX',t:'암 기둥(클램프) 좌우 위치',min:-1200,max:1200,step:10},
+];
+function renderMonitors(){
+  const box=$('#monitors'),L=S.monitors;
+  L.forEach(e=>{if(e.desk>S.extraDesks.length)e.desk=0});
+  const deskOpts=[{v:0,l:'책상 1'},...S.extraDesks.map((_,i)=>({v:i+1,l:`책상 ${i+2}`}))];
+  box.innerHTML=L.map((e,i)=>{const sp=MONITORS[e.mon]||MONITORS['27'];return `<div class="xd"><div class="xh"><b>모니터 ${i+2}</b><button class="del" data-i="${i}">삭제</button></div>
+    <div class="lab"><span>놓을 책상</span></div><div class="seg" style="margin-bottom:12px">${deskOpts.map(o=>`<button data-i="${i}" data-desk="${o.v}" class="${e.desk===o.v?'on':''}">${o.l}</button>`).join('')}</div>
+    <div class="row"><div class="lab"><span>모델</span></div><select data-i="${i}">${Object.entries(MONITORS).map(([v,m])=>`<option value="${v}" ${e.mon===v?'selected':''}>${m.label}</option>`).join('')}</select></div>
+    ${sp.R?`<div class="row"><label class="tg"><span>커브드 화면</span><input type="checkbox" data-i="${i}" data-f="curved" ${e.curved?'checked':''}><i></i></label></div>`:''}
+    <div class="lab"><span>거치 방식</span></div><div class="seg" style="margin-bottom:12px">${[['stand','기본 스탠드'],['arm','모니터암']].map(([v,l])=>`<button data-i="${i}" data-mount="${v}" class="${e.mount===v?'on':''}">${l}</button>`).join('')}</div>
+    <div class="row"><label class="tg"><span>세로로 세우기 (피벗)</span><input type="checkbox" data-i="${i}" data-f="portrait" ${e.portrait?'checked':''}><i></i></label></div>
+    ${rangeRows(MF.filter(f=>f.k!=='armX'||e.mount==='arm'),e,i)}</div>`}).join('')
+    +(L.length<3?'<button class="add" id="addMonitor">+ 모니터 추가</button>':'<div class="note">모니터는 모니터 1을 포함해 최대 4대까지 놓을 수 있어요.</div>');
+  wireRanges(box,L,MF);
+  const re=()=>{renderMonitors();schedule()};
+  box.querySelectorAll('[data-desk]').forEach(b=>b.addEventListener('click',()=>{const e=L[b.dataset.i];e.desk=Number(b.dataset.desk);e.x=0;re()}));
+  box.querySelectorAll('select').forEach(sl=>sl.addEventListener('change',()=>{const e=L[sl.dataset.i];e.mon=sl.value;e.curved=!!MONITORS[e.mon].R;re()}));
+  box.querySelectorAll('[data-mount]').forEach(b=>b.addEventListener('click',()=>{const e=L[b.dataset.i];e.mount=b.dataset.mount;e.back=e.mount==='stand'?200:120;re()})); // 모니터 1과 같은 기본 위치
+  box.querySelectorAll('.tg input').forEach(c=>c.addEventListener('change',()=>{L[c.dataset.i][c.dataset.f]=c.checked;re()}));
+  box.querySelectorAll('.del').forEach(b=>b.addEventListener('click',()=>{L.splice(Number(b.dataset.i),1);re()}));
+  const add=$('#addMonitor');if(add)add.addEventListener('click',()=>{L.push(newMonitor());re()});
+}
 function placeExtra(e){
   const {deskW:W,deskD:D}=S;
   switch(e.place){
@@ -987,36 +1044,25 @@ function build(){
   if(S.mount==='stand')addStand(main,-(S.monLift+main.chin+main.h/2));
   items.add(main.g);
   const mons=[main];
-  const sides=S.subCount==2?[-1,1]:S.subCount==1?[S.subSide==='left'?-1:1]:[];
-  for(const s of sides){
-    const sm=buildMonitor(MONITORS[S.sub],{portrait:S.subPortrait});
-    const aa=S.subAngle*Math.PI/180+(curved?main.thB/2:0);
-    const ex=S.monX+s*(main.halfW+12),ez=mainZ+main.sag;
-    const scy=H+S.monLift+sm.chin+sm.h/2;
-    sm.g.position.set(ex+s*sm.W/2*Math.cos(aa),scy,ez+sm.W/2*Math.sin(aa));
-    sm.g.rotation.y=-s*aa;
-    if(S.mount==='stand')addStand(sm,-(S.monLift+sm.chin+sm.h/2));
-    items.add(sm.g);mons.push(sm);
-  }
   items.updateMatrixWorld(true);
   let tray=null;
   if(S.mount!=='stand'){
     const pm=M('#2a2b2f',{r:.35,m:.4}),pz=-D/2+40,px=Math.max(-W/2+60,Math.min(W/2-60,S.monX+S.armX));
-    const topY=Math.max(...mons.map(m=>m.g.position.y))+60,ph=Math.max(420,topY-H);
+    const topY=main.g.position.y+60,ph=Math.max(420,topY-H);
     items.add(cylBetween(V(px,H,pz),V(px,H+ph,pz),18,pm));
     items.add(at(box(70,50,90,pm),px,H-10,-D/2+40));
-    for(const m of mons){
-      m.g.add(at(box(100,100,12,pm),0,0,-m.hd-6-(m.thB?0:0)));
+    {const m=main; // 모니터 1의 암
+      m.g.add(at(box(100,100,12,pm),0,0,-m.hd-6));
       const p=m.g.localToWorld(V(0,0,-m.hd-14));
       const p0=V(px,p.y,pz),j=V(px+(p.x-px)*.55,p.y,pz+Math.max(30,(p.z-pz)*.25));
       items.add(cylBetween(p0,j,14,pm));items.add(cylBetween(j,p,14,pm));
       items.add(at(new THREE.Mesh(new THREE.SphereGeometry(20,16,12),pm),j.x,j.y,j.z));
     }
     if(S.mount==='armLap'){
-      const mb=new THREE.Box3();mons.forEach(m=>mb.expandByObject(m.body));
+      const mb=new THREE.Box3();mb.expandByObject(main.body);
       const lp=buildLaptop(S.lapSize),sd=S.lapSide==='left'?-1:1;
       const ty=Math.max(H+130,H+S.monLift-30);
-      const tp=trayPlace(V(sd<0?mb.min.x:mb.max.x,ty,mainZ+(S.subCount?0:main.sag)),0,sd,S.lapAngle*Math.PI/180,lp);
+      const tp=trayPlace(V(sd<0?mb.min.x:mb.max.x,ty,mainZ+main.sag),0,sd,S.lapAngle*Math.PI/180,lp);
       tray=new THREE.Group();tray.position.copy(tp.p);tray.rotation.set(.17,tp.pt,0,'YXZ');
       tray.add(at(box(lp.w+40,6,lp.d+30,pm),0,-3,0));
       tray.add(at(box(lp.w+40,28,6,pm),0,11,(lp.d+30)/2-3));
@@ -1029,7 +1075,10 @@ function build(){
       items.add(at(new THREE.Mesh(new THREE.SphereGeometry(20,16,12),pm),j.x,j.y,j.z));
     }
   }
+  // 추가 모니터: 각자 모델·거치·책상·위치·높이·각도를 따로 가진다. 책상 1 위의 것만 좌우 여유·시야각 점검에 들어간다
+  const monItems=S.monitors.map(e=>{const it=buildMonitorItem(e,deskCtx(e.desk));(e.desk?extra:items).add(it.g);return {it,e}});
   items.updateMatrixWorld(true);
+  monItems.forEach(({it,e})=>{if(!e.desk)mons.push(it.m)});
   const monBox=new THREE.Box3();mons.forEach(m=>monBox.expandByObject(m.body));
   const sideBox=monBox.clone();if(tray)sideBox.expandByObject(tray);
 
@@ -1095,7 +1144,7 @@ function updateCards(){
   $('#cDesk').textContent=`${S.deskW} × ${S.deskD}`;
   $('#cDeskS').textContent=`DESK / H ${S.deskH} mm${S.extraDesks.length?` · +${S.extraDesks.length} DESK`:''}${S.drawers.length?` · ${S.drawers.length} DRAWER`:''}`;
   $('#cMon').textContent=`${Math.round(m.w)} × ${Math.round(m.h)}`;
-  $('#cMonS').textContent=`${spec.short}${info.curved?' CURVED':''}${S.mount==='armLap'?` + LAPTOP ${S.lapSize}"`:''}${S.subCount?` + ${MONITORS[S.sub].short}×${S.subCount}`:''} / mm`;
+  $('#cMonS').textContent=`${spec.short}${info.curved?' CURVED':''}${S.mount==='armLap'?` + LAPTOP ${S.lapSize}"`:''}${S.monitors.length?` + 모니터 ${S.monitors.length}대`:''} / mm`;
 }
 function eyeY(){const H=S.userH*10;return S.deskH>=900?.936*H:S.deskH+.295*H}
 let lastChecks=[];
@@ -1168,7 +1217,7 @@ $('#auto').addEventListener('change',e=>setAuto(e.target.checked));
 let memSlots={};
 function getSlots(){try{return JSON.parse(localStorage.getItem('desksim-slots')||'null')||memSlots}catch(e){return memSlots}}
 function putSlots(o){memSlots=o;try{localStorage.setItem('desksim-slots',JSON.stringify(o))}catch(e){}}
-function summary(c){return `${c.deskW}×${c.deskD} · ${MONITORS[c.mon]?.short||''}${c.subCount?` + ${MONITORS[c.sub]?.short}×${c.subCount}`:''} · ${KB_NAME[c.kb]}${c.extraDesks&&c.extraDesks.length?` · 책상 ${c.extraDesks.length+1}개`:''}${c.drawers&&c.drawers.length?` · 서랍 ${c.drawers.length}`:''}${c.room?` · 방 ${c.roomW}×${c.roomD}`:''}${c.sets&&c.sets.length?` · 세트 ${c.sets.length}`:''}${c.pegs&&c.pegs.length?` · 타공판 ${c.pegs.length}`:''}`}
+function summary(c){return `${c.deskW}×${c.deskD} · ${MONITORS[c.mon]?.short||''}${(c.monitors?c.monitors.length:(c.subCount||0))?` + 모니터 ${c.monitors?c.monitors.length:c.subCount}대`:''} · ${KB_NAME[c.kb]}${c.extraDesks&&c.extraDesks.length?` · 책상 ${c.extraDesks.length+1}개`:''}${c.drawers&&c.drawers.length?` · 서랍 ${c.drawers.length}`:''}${c.room?` · 방 ${c.roomW}×${c.roomD}`:''}${c.sets&&c.sets.length?` · 세트 ${c.sets.length}`:''}${c.pegs&&c.pegs.length?` · 타공판 ${c.pegs.length}`:''}`}
 function renderSlots(){
   const sl=getSlots();
   $('#slots').innerHTML=['A','B','C'].map(k=>`<div class="slot"><button class="load ${sl[k]?'':'empty'}" data-k="${k}"><b>${k}</b>${sl[k]?summary(sl[k]):'비어 있음'}</button><button class="save" data-k="${k}">저장</button></div>`).join('');
@@ -1189,9 +1238,24 @@ function loop(now){requestAnimationFrame(loop);if(camAnim)camAnim(now);controls.
 const FIELDS={};for(const sec of UI)for(const it of sec.items)FIELDS[it.k]={...it,section:sec.sec};
 const clone=o=>JSON.parse(JSON.stringify(o));
 const VIEWS=['iso','front','top','side','pov'];
+// 예전 저장본은 모니터 2·3이 모니터 1 옆에 붙는 방식(subCount …)이었다. 같은 모습의 독립 모니터로 바꿔서 불러온다
+const LEGACY_SUB=['subCount','subSide','sub','subPortrait','subAngle'];
+function migrate(c){
+  const o={...c};
+  if(!o.monitors&&o.subCount>0){
+    const aa=(o.subAngle==null?20:o.subAngle)*Math.PI/180,sides=o.subCount==2?[-1,1]:[o.subSide==='left'?-1:1];
+    const W1=monWidth(o.mon||'27',false),W2=monWidth(o.sub||'27',!!o.subPortrait),r10=v=>Math.round(v/10)*10;
+    o.monitors=sides.map(s=>({desk:0,mon:o.sub||'27',curved:false,mount:(o.mount||'stand')==='stand'?'stand':'arm',portrait:!!o.subPortrait,
+      x:r10((o.monX||0)+s*(W1/2+12+W2/2*Math.cos(aa))),lift:o.monLift==null?100:o.monLift,
+      back:r10((o.monBack==null?200:o.monBack)+W2/2*Math.sin(aa)),yaw:-s*Math.round(aa*180/Math.PI),armX:0}));
+  }
+  for(const k of LEGACY_SUB)delete o[k];
+  return o;
+}
 function loadState(c){
-  S={...DEFAULTS,...c,extraDesks:(c.extraDesks||[]).map(o=>({...o})),drawers:(c.drawers||[]).map(o=>({...o})),sets:(c.sets||[]).map(o=>({...o})),pegs:(c.pegs||[]).map(o=>({...o}))};
-  refreshUI();renderExtra();renderDrawers();renderSets();renderPegs();build();reframe();
+  c=migrate(c);
+  S={...DEFAULTS,...c,extraDesks:(c.extraDesks||[]).map(o=>({...o})),drawers:(c.drawers||[]).map(o=>({...o})),sets:(c.sets||[]).map(o=>({...o})),pegs:(c.pegs||[]).map(o=>({...o})),monitors:(c.monitors||[]).map(o=>({...o}))};
+  refreshUI();renderExtra();renderDrawers();renderSets();renderPegs();renderMonitors();build();reframe();
 }
 const optList=f=>(typeof f.opts==='function'?f.opts():f.opts).map(norm);
 function specOf(f){
@@ -1228,6 +1292,11 @@ function applyPatch(patch){
 const rangeField=f=>({...f,type:'range',unit:f.unit||'mm'});
 const deskOpts=()=>[0,...S.extraDesks.map((_,i)=>i+1)].map(v=>({v,l:v?`책상 ${v+1}`:'책상 1'}));
 const COLS={
+  monitors:{label:'모니터',fields:[{k:'desk',t:'놓을 책상 (선택지 이름 그대로 써도 돼요)',type:'select',opts:deskOpts},
+    {k:'mon',t:'모델',type:'select',opts:Object.entries(MONITORS).map(([v,m])=>({v,l:m.label}))},
+    {k:'curved',t:'커브드 화면 (곡면 모델만 의미 있음)',type:'toggle'},
+    {k:'mount',t:'거치 방식',type:'select',opts:[{v:'stand',l:'기본 스탠드'},{v:'arm',l:'모니터암'}]},
+    {k:'portrait',t:'세로로 세우기 (피벗)',type:'toggle'},...MF.map(rangeField)]},
   extraDesks:{label:'추가 책상',fields:[{k:'place',t:'위치',type:'select',opts:PLACES},...XF.map(rangeField)]},
   drawers:{label:'서랍장',fields:[{k:'where',t:'위치',type:'select',opts:WHERE},...DF.map(rangeField),
     {k:'tiers',t:'서랍 칸 수',type:'range',min:1,max:6,step:1,unit:'단'},{k:'casters',t:'바퀴',type:'toggle'},{k:'color',t:'색',type:'select',opts:DESK_COLORS}]},
@@ -1241,12 +1310,17 @@ const COLS={
 };
 function collections(){
   const out={};
-  for(const a of ARR)out[a.key]={label:COLS[a.key].label,item_label:a.item,max:a.max,first:a.first,fields:COLS[a.key].fields.map(specOf)};
+  for(const a of ARR)out[a.key]={label:COLS[a.key].label,item_label:a.item,max:a.max,max_note:a.maxNote,first:a.first,fields:COLS[a.key].fields.map(specOf)};
   return out;
 }
-const REND={extraDesks:()=>renderExtra(),drawers:()=>renderDrawers(),sets:()=>renderSets(),pegs:()=>renderPegs()};
+const REND={monitors:()=>renderMonitors(),extraDesks:()=>renderExtra(),drawers:()=>renderDrawers(),sets:()=>renderSets(),pegs:()=>renderPegs()};
 // 패널에서 같은 값을 골랐을 때 일어나는 연쇄 변경을 그대로 따른다
 function afterSet(col,k,e){
+  if(col==='monitors'){ // 모니터 1을 바꿀 때와 같은 연쇄 변경
+    if(k==='mon')e.curved=!!MONITORS[e.mon].R;
+    if(k==='mount')e.back=e.mount==='stand'?200:120;
+    if(k==='desk')e.x=0;
+  }
   if(col==='extraDesks'&&k==='place'&&e.place.startsWith('front')){e.gap=0;e.shift=0;if(e.w>1200)e.w=800;if(e.d>600)e.d=500}
   if(col==='drawers'&&k==='where'){e.x=0;e.z=0;
     if(e.where.startsWith('FL')){e.h=Math.min(e.h,S.deskH);e.casters=false}
@@ -1258,7 +1332,8 @@ function afterSet(col,k,e){
 /* 한 아이템의 값을 검증해 넣는다. 거절된 값은 사유 글로 돌려준다 */
 function setFields(col,i,values){
   const specs=Object.fromEntries(COLS[col].fields.map(f=>[f.k,f])),e=S[col][i],bad=[];
-  const keys=Object.keys(values||{}).sort((a,b)=>(specs[a]&&specs[a].type==='range'?1:0)-(specs[b]&&specs[b].type==='range'?1:0)); // 위치 같은 선택지를 먼저, 숫자는 나중에 덮어쓴다
+  const rank=k=>{const f=specs[k];return !f?1:f.type==='range'?2:f.type==='select'?0:1}; // 선택지 → 켜기/끄기 → 숫자 순서로 넣어, 선택지의 연쇄 변경을 뒤의 값이 덮어쓰게 한다
+  const keys=Object.keys(values||{}).sort((a,b)=>rank(a)-rank(b));
   for(const k of keys){
     const f=specs[k];
     if(!f){bad.push(`${k}: 알 수 없는 항목이에요`);continue}
@@ -1276,7 +1351,7 @@ function runOp(op){
   const L=S[a.key],n=i=>`${a.item} ${i+a.first}`;
   const bad=b=>b.length?` (일부 값은 거절: ${b.join('; ')})`:'';
   if(op.op==='add'){
-    if(L.length>=a.max)return failOp(`${a.label}은(는) 최대 ${a.max}개예요`);
+    if(L.length>=a.max)return failOp(a.maxNote||`${a.label}은(는) 최대 ${a.max}개예요`);
     const before=L.length;const btn=$(a.addBtn);if(btn)btn.click();   // 기본값은 패널의 추가 버튼과 같다
     if(L.length===before)return failOp(`${a.label}을(를) 추가하지 못했어요`);
     const i=L.length-1;return okOp(`${n(i)} 추가`+bad(setFields(a.key,i,op.values)));
@@ -1322,7 +1397,7 @@ window.deskSim={
   autoRotate:on=>setAuto(!!on),
 };
 
-renderPanel();renderExtra();renderDrawers();renderSets();renderPegs();refreshUI();renderSlots();build();setView('iso',true);resize();setAuto(false);requestAnimationFrame(loop);
+renderPanel();renderExtra();renderDrawers();renderSets();renderPegs();renderMonitors();refreshUI();renderSlots();build();setView('iso',true);resize();setAuto(false);requestAnimationFrame(loop);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>build());
 })();
 </script>
@@ -1359,7 +1434,7 @@ async function send(question){
 function showApproval(ev){
   const card=document.createElement('div');card.className='approval';card.setAttribute('role','group');card.setAttribute('aria-label','설정 변경 승인');
   const li=ev.changes.map(c=>`<li><span>${esc(c.label)}</span><span>${c.from?esc(c.from)+' → ':''}${esc(c.to)}</span></li>`).join('');
-  const extra=[...Object.values(ev.notes||{}),...Object.entries(ev.rejected||{}).map(([k,v])=>k+': '+v)];
+  const extra=[...Object.values(ev.notes||{}),...Object.entries(ev.rejected||{}).map(([k,v])=>k+': '+v),...(ev.problems||[]).map(p=>'적용하지 않는 값 — '+p)];
   card.innerHTML=`<b>설정을 이렇게 바꿀까요?</b>${ev.reason?`<p class="why">${esc(ev.reason)}</p>`:''}<ul>${li}</ul>${extra.length?`<p class="warn">${extra.map(esc).join('<br>')}</p>`:''}<div class="btns"><button type="button" class="ok">적용하기</button><button type="button" class="no">취소</button></div>`;
   msgs.appendChild(card);msgs.scrollTop=msgs.scrollHeight;
   card.querySelector('.ok').focus();

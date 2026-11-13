@@ -1,0 +1,24 @@
+# 비밀 값은 이미지에 넣지 않는다(실행할 때 --env-file .env)
+.env
+.env.*
+*.pem
+*.key
+.aws/
+
+# 실행에 필요 없는 것
+.git/
+.gitignore
+.claude/
+.archify/
+.vscode/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+tests/
+evaluation/
+docs/
+*.md
+!knowledge/*.md

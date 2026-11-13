@@ -67,6 +67,7 @@ def get_graph():
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     config.load_settings()  # 필수 설정(.env)이 없으면 여기서 ConfigError를 내서 서버가 뜨지 않는다
+    get_graph()  # 그래프와 가이드 문서 검색기를 미리 만든다(문서 임베딩은 백그라운드에서 진행)
     yield
 
 

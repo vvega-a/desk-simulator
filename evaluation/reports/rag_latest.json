@@ -1,0 +1,756 @@
+{
+ "meta": {
+  "when": "2026-11-13 10:50",
+  "embed_model": "amazon.titan-embed-text-v2:0",
+  "queries": 20,
+  "chunks": 26,
+  "vector_error": null
+ },
+ "results": {
+  "bm25": {
+   "hit@1": 0.6,
+   "hit@3": 0.9,
+   "mrr": 0.75,
+   "rows": [
+    {
+     "id": "q_dist_formula",
+     "rank": 1,
+     "top": [
+      "viewing-distance#1",
+      "monitor-choice#5",
+      "monitor-choice#4"
+     ]
+    },
+    {
+     "id": "q_dist_32",
+     "rank": 2,
+     "top": [
+      "monitor-height#3",
+      "viewing-distance#1",
+      "monitor-choice#1"
+     ]
+    },
+    {
+     "id": "q_dist_fix",
+     "rank": 1,
+     "top": [
+      "viewing-distance#2",
+      "monitor-height#2",
+      "viewing-distance#1"
+     ]
+    },
+    {
+     "id": "q_fov",
+     "rank": 1,
+     "top": [
+      "viewing-distance#3",
+      "monitor-choice#1",
+      "monitor-choice#2"
+     ]
+    },
+    {
+     "id": "q_eye_strain",
+     "rank": null,
+     "top": [
+      "desk-chair-height#2",
+      "desk-chair-height#4",
+      "monitor-height#3"
+     ]
+    },
+    {
+     "id": "q_mon_height",
+     "rank": 2,
+     "top": [
+      "viewing-distance#3",
+      "monitor-height#2",
+      "monitor-height#4"
+     ]
+    },
+    {
+     "id": "q_neck",
+     "rank": 1,
+     "top": [
+      "monitor-height#1",
+      "monitor-height#2",
+      "viewing-distance#3"
+     ]
+    },
+    {
+     "id": "q_laptop",
+     "rank": 1,
+     "top": [
+      "monitor-height#2",
+      "space-layout#4",
+      "monitor-choice#3"
+     ]
+    },
+    {
+     "id": "q_pivot",
+     "rank": null,
+     "top": [
+      "monitor-choice#2",
+      "viewing-distance#2",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_dual",
+     "rank": 1,
+     "top": [
+      "monitor-height#4",
+      "space-layout#4",
+      "monitor-choice#2"
+     ]
+    },
+    {
+     "id": "q_desk_height",
+     "rank": 2,
+     "top": [
+      "desk-chair-height#2",
+      "desk-chair-height#1",
+      "desk-chair-height#3"
+     ]
+    },
+    {
+     "id": "q_standing",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#2",
+      "keyboard-mouse#3",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_chair",
+     "rank": 2,
+     "top": [
+      "viewing-distance#4",
+      "desk-chair-height#4",
+      "keyboard-mouse#1"
+     ]
+    },
+    {
+     "id": "q_kb_gap",
+     "rank": 2,
+     "top": [
+      "keyboard-mouse#2",
+      "keyboard-mouse#1",
+      "monitor-choice#3"
+     ]
+    },
+    {
+     "id": "q_kb_layout",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#2"
+     ]
+    },
+    {
+     "id": "q_wrist",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#4",
+      "keyboard-mouse#1"
+     ]
+    },
+    {
+     "id": "q_aisle",
+     "rank": 2,
+     "top": [
+      "desk-chair-height#3",
+      "space-layout#2",
+      "desk-chair-height#4"
+     ]
+    },
+    {
+     "id": "q_drawer",
+     "rank": 1,
+     "top": [
+      "space-layout#3",
+      "desk-chair-height#3",
+      "keyboard-mouse#4"
+     ]
+    },
+    {
+     "id": "q_arm",
+     "rank": 1,
+     "top": [
+      "monitor-choice#3",
+      "keyboard-mouse#1",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_uw_vs_dual",
+     "rank": 1,
+     "top": [
+      "monitor-choice#2",
+      "monitor-choice#1",
+      "viewing-distance#3"
+     ]
+    }
+   ]
+  },
+  "bm25+exp": {
+   "hit@1": 0.9,
+   "hit@3": 1.0,
+   "mrr": 0.9416666666666667,
+   "rows": [
+    {
+     "id": "q_dist_formula",
+     "rank": 1,
+     "top": [
+      "viewing-distance#1",
+      "monitor-choice#5",
+      "viewing-distance#4"
+     ]
+    },
+    {
+     "id": "q_dist_32",
+     "rank": 1,
+     "top": [
+      "monitor-choice#5",
+      "viewing-distance#1",
+      "monitor-choice#1"
+     ]
+    },
+    {
+     "id": "q_dist_fix",
+     "rank": 1,
+     "top": [
+      "viewing-distance#2",
+      "monitor-height#2",
+      "viewing-distance#1"
+     ]
+    },
+    {
+     "id": "q_fov",
+     "rank": 1,
+     "top": [
+      "viewing-distance#3",
+      "monitor-choice#1",
+      "monitor-height#1"
+     ]
+    },
+    {
+     "id": "q_eye_strain",
+     "rank": 1,
+     "top": [
+      "viewing-distance#4",
+      "desk-chair-height#2",
+      "viewing-distance#1"
+     ]
+    },
+    {
+     "id": "q_mon_height",
+     "rank": 2,
+     "top": [
+      "viewing-distance#3",
+      "monitor-height#2",
+      "monitor-height#4"
+     ]
+    },
+    {
+     "id": "q_neck",
+     "rank": 1,
+     "top": [
+      "monitor-height#1",
+      "viewing-distance#3",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_laptop",
+     "rank": 1,
+     "top": [
+      "monitor-height#2",
+      "space-layout#4",
+      "monitor-choice#3"
+     ]
+    },
+    {
+     "id": "q_pivot",
+     "rank": 1,
+     "top": [
+      "monitor-height#3",
+      "monitor-choice#2",
+      "viewing-distance#2"
+     ]
+    },
+    {
+     "id": "q_dual",
+     "rank": 1,
+     "top": [
+      "monitor-height#4",
+      "space-layout#4",
+      "monitor-choice#2"
+     ]
+    },
+    {
+     "id": "q_desk_height",
+     "rank": 3,
+     "top": [
+      "monitor-choice#5",
+      "desk-chair-height#2",
+      "desk-chair-height#1"
+     ]
+    },
+    {
+     "id": "q_standing",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#2",
+      "monitor-height#2",
+      "desk-chair-height#1"
+     ]
+    },
+    {
+     "id": "q_chair",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#4",
+      "viewing-distance#4",
+      "desk-chair-height#1"
+     ]
+    },
+    {
+     "id": "q_kb_gap",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#1",
+      "monitor-choice#3",
+      "keyboard-mouse#2"
+     ]
+    },
+    {
+     "id": "q_kb_layout",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#2",
+      "keyboard-mouse#1",
+      "keyboard-mouse#3"
+     ]
+    },
+    {
+     "id": "q_wrist",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#4",
+      "monitor-height#1",
+      "keyboard-mouse#1"
+     ]
+    },
+    {
+     "id": "q_aisle",
+     "rank": 1,
+     "top": [
+      "space-layout#2",
+      "desk-chair-height#3",
+      "desk-chair-height#4"
+     ]
+    },
+    {
+     "id": "q_drawer",
+     "rank": 1,
+     "top": [
+      "space-layout#3",
+      "desk-chair-height#3",
+      "space-layout#4"
+     ]
+    },
+    {
+     "id": "q_arm",
+     "rank": 1,
+     "top": [
+      "monitor-choice#3",
+      "keyboard-mouse#1",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_uw_vs_dual",
+     "rank": 1,
+     "top": [
+      "monitor-choice#2",
+      "monitor-choice#1",
+      "viewing-distance#3"
+     ]
+    }
+   ]
+  },
+  "vector": {
+   "hit@1": 0.8,
+   "hit@3": 0.9,
+   "mrr": 0.85,
+   "rows": [
+    {
+     "id": "q_dist_formula",
+     "rank": 1,
+     "top": [
+      "viewing-distance#1",
+      "monitor-height#1",
+      "keyboard-mouse#1"
+     ]
+    },
+    {
+     "id": "q_dist_32",
+     "rank": null,
+     "top": [
+      "viewing-distance#2",
+      "monitor-height#1",
+      "monitor-choice#4"
+     ]
+    },
+    {
+     "id": "q_dist_fix",
+     "rank": 2,
+     "top": [
+      "monitor-height#1",
+      "viewing-distance#2",
+      "monitor-height#3"
+     ]
+    },
+    {
+     "id": "q_fov",
+     "rank": 1,
+     "top": [
+      "viewing-distance#3",
+      "monitor-height#1",
+      "viewing-distance#4"
+     ]
+    },
+    {
+     "id": "q_eye_strain",
+     "rank": 1,
+     "top": [
+      "viewing-distance#4",
+      "monitor-height#1",
+      "viewing-distance#3"
+     ]
+    },
+    {
+     "id": "q_mon_height",
+     "rank": 1,
+     "top": [
+      "monitor-height#2",
+      "monitor-height#4",
+      "monitor-height#1"
+     ]
+    },
+    {
+     "id": "q_neck",
+     "rank": 1,
+     "top": [
+      "monitor-height#1",
+      "keyboard-mouse#4",
+      "desk-chair-height#3"
+     ]
+    },
+    {
+     "id": "q_laptop",
+     "rank": null,
+     "top": [
+      "monitor-height#3",
+      "monitor-height#1",
+      "desk-chair-height#1"
+     ]
+    },
+    {
+     "id": "q_pivot",
+     "rank": 2,
+     "top": [
+      "monitor-height#2",
+      "monitor-height#3",
+      "monitor-height#1"
+     ]
+    },
+    {
+     "id": "q_dual",
+     "rank": 1,
+     "top": [
+      "monitor-height#4",
+      "monitor-choice#2",
+      "space-layout#1"
+     ]
+    },
+    {
+     "id": "q_desk_height",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#1",
+      "desk-chair-height#2",
+      "desk-chair-height#3"
+     ]
+    },
+    {
+     "id": "q_standing",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#2",
+      "desk-chair-height#1",
+      "monitor-height#1"
+     ]
+    },
+    {
+     "id": "q_chair",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#4",
+      "desk-chair-height#1",
+      "desk-chair-height#3"
+     ]
+    },
+    {
+     "id": "q_kb_gap",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#1",
+      "monitor-choice#4",
+      "monitor-choice#3"
+     ]
+    },
+    {
+     "id": "q_kb_layout",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#2",
+      "monitor-choice#2",
+      "space-layout#5"
+     ]
+    },
+    {
+     "id": "q_wrist",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#4",
+      "desk-chair-height#4",
+      "viewing-distance#3"
+     ]
+    },
+    {
+     "id": "q_aisle",
+     "rank": 1,
+     "top": [
+      "space-layout#2",
+      "desk-chair-height#4",
+      "space-layout#3"
+     ]
+    },
+    {
+     "id": "q_drawer",
+     "rank": 1,
+     "top": [
+      "space-layout#3",
+      "desk-chair-height#3",
+      "desk-chair-height#4"
+     ]
+    },
+    {
+     "id": "q_arm",
+     "rank": 1,
+     "top": [
+      "monitor-choice#3",
+      "monitor-choice#2",
+      "monitor-height#4"
+     ]
+    },
+    {
+     "id": "q_uw_vs_dual",
+     "rank": 1,
+     "top": [
+      "monitor-choice#2",
+      "viewing-distance#3",
+      "monitor-choice#1"
+     ]
+    }
+   ]
+  },
+  "hybrid": {
+   "hit@1": 1.0,
+   "hit@3": 1.0,
+   "mrr": 1.0,
+   "rows": [
+    {
+     "id": "q_dist_formula",
+     "rank": 1,
+     "top": [
+      "viewing-distance#1",
+      "monitor-choice#5",
+      "viewing-distance#3"
+     ]
+    },
+    {
+     "id": "q_dist_32",
+     "rank": 1,
+     "top": [
+      "monitor-choice#5",
+      "viewing-distance#1",
+      "viewing-distance#2"
+     ]
+    },
+    {
+     "id": "q_dist_fix",
+     "rank": 1,
+     "top": [
+      "viewing-distance#2",
+      "monitor-height#2",
+      "monitor-height#1"
+     ]
+    },
+    {
+     "id": "q_fov",
+     "rank": 1,
+     "top": [
+      "viewing-distance#3",
+      "monitor-height#1",
+      "monitor-choice#2"
+     ]
+    },
+    {
+     "id": "q_eye_strain",
+     "rank": 1,
+     "top": [
+      "viewing-distance#4",
+      "viewing-distance#1",
+      "viewing-distance#3"
+     ]
+    },
+    {
+     "id": "q_mon_height",
+     "rank": 1,
+     "top": [
+      "monitor-height#2",
+      "monitor-height#4",
+      "viewing-distance#2"
+     ]
+    },
+    {
+     "id": "q_neck",
+     "rank": 1,
+     "top": [
+      "monitor-height#1",
+      "keyboard-mouse#4",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_laptop",
+     "rank": 1,
+     "top": [
+      "monitor-height#2",
+      "viewing-distance#2",
+      "desk-chair-height#1"
+     ]
+    },
+    {
+     "id": "q_pivot",
+     "rank": 1,
+     "top": [
+      "monitor-height#3",
+      "monitor-height#2",
+      "viewing-distance#2"
+     ]
+    },
+    {
+     "id": "q_dual",
+     "rank": 1,
+     "top": [
+      "monitor-height#4",
+      "monitor-choice#2",
+      "space-layout#4"
+     ]
+    },
+    {
+     "id": "q_desk_height",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#1",
+      "desk-chair-height#2",
+      "monitor-choice#5"
+     ]
+    },
+    {
+     "id": "q_standing",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#2",
+      "desk-chair-height#1",
+      "monitor-height#2"
+     ]
+    },
+    {
+     "id": "q_chair",
+     "rank": 1,
+     "top": [
+      "desk-chair-height#4",
+      "desk-chair-height#1",
+      "viewing-distance#4"
+     ]
+    },
+    {
+     "id": "q_kb_gap",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#1",
+      "monitor-choice#3",
+      "keyboard-mouse#2"
+     ]
+    },
+    {
+     "id": "q_kb_layout",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#2",
+      "space-layout#5",
+      "keyboard-mouse#3"
+     ]
+    },
+    {
+     "id": "q_wrist",
+     "rank": 1,
+     "top": [
+      "keyboard-mouse#4",
+      "monitor-height#1",
+      "desk-chair-height#1"
+     ]
+    },
+    {
+     "id": "q_aisle",
+     "rank": 1,
+     "top": [
+      "space-layout#2",
+      "desk-chair-height#4",
+      "desk-chair-height#3"
+     ]
+    },
+    {
+     "id": "q_drawer",
+     "rank": 1,
+     "top": [
+      "space-layout#3",
+      "desk-chair-height#3",
+      "space-layout#5"
+     ]
+    },
+    {
+     "id": "q_arm",
+     "rank": 1,
+     "top": [
+      "monitor-choice#3",
+      "monitor-height#2",
+      "monitor-height#4"
+     ]
+    },
+    {
+     "id": "q_uw_vs_dual",
+     "rank": 1,
+     "top": [
+      "monitor-choice#2",
+      "monitor-choice#1",
+      "viewing-distance#3"
+     ]
+    }
+   ]
+  }
+ }
+}

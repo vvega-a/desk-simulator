@@ -1,0 +1,9 @@
+# docker compose up --build   → http://localhost:8000  (.env를 먼저 만든다: cp .env.sample .env)
+services:
+  app:
+    build: .
+    image: desk-simulator
+    ports:
+      - "8000:8000"
+    env_file: .env
+    restart: unless-stopped
